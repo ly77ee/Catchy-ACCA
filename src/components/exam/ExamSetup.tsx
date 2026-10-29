@@ -18,7 +18,8 @@ import {
   Play,
   Filter,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  HelpCircle
 } from 'lucide-react';
 
 interface ExamSetupProps {
@@ -27,6 +28,7 @@ interface ExamSetupProps {
   materials: StudyMaterial[];
   defaultPaperId?: string;
   onStartExam: (config: ExamConfig) => void;
+  onOpenQuestionInManager?: (questionId: string) => void;
 }
 
 export const ExamSetup: React.FC<ExamSetupProps> = ({
@@ -35,6 +37,7 @@ export const ExamSetup: React.FC<ExamSetupProps> = ({
   materials,
   defaultPaperId = 'FR',
   onStartExam,
+  onOpenQuestionInManager,
 }) => {
   const [paperId, setPaperId] = useState<string>(defaultPaperId);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
@@ -140,21 +143,35 @@ export const ExamSetup: React.FC<ExamSetupProps> = ({
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
       {/* Header Banner */}
-      <div className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] p-6 shadow-xl">
-        <div className="flex items-center space-x-2">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-acca-red bg-acca-red/10 border border-acca-red/20 px-2.5 py-0.5 rounded-full">
-            CBE Exam Simulator
-          </span>
-          <span className="text-xs text-gray-400">
-            {version.name}
-          </span>
+      <div className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center space-x-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-acca-red bg-acca-red/10 border border-acca-red/20 px-2.5 py-0.5 rounded-full">
+              ACCA Mock Exams
+            </span>
+            <span className="text-xs text-gray-400">
+              {version.name}
+            </span>
+          </div>
+          <h1 className="text-xl md:text-2xl font-black text-white mt-2">
+            Configure Mock Exam
+          </h1>
+          <p className="text-xs text-gray-400 mt-1 max-w-2xl">
+            Simulate official ACCA Computer Based Exam (CBE) conditions with authored syllabus questions. Practise objective MCQs or solve constructed scenarios using the integrated Word answer writer and Excel spreadsheet workspace.
+          </p>
         </div>
-        <h1 className="text-xl md:text-2xl font-black text-white mt-2">
-          Configure Exam Simulation
-        </h1>
-        <p className="text-xs text-gray-400 mt-1 max-w-2xl">
-          Simulate official ACCA Computer Based Exam (CBE) conditions with authored syllabus questions. Practise objective MCQs or solve constructed scenarios using the integrated Word answer writer and Excel spreadsheet workspace.
-        </p>
+
+        {onOpenQuestionInManager && (
+          <button
+            type="button"
+            onClick={() => onOpenQuestionInManager('')}
+            className="px-3.5 py-2 bg-[#141419] hover:bg-[#25252e] text-gray-300 hover:text-white rounded-xl border border-[#2a2a34] text-xs font-bold flex items-center space-x-2 transition-colors shrink-0"
+            title="Open Question Bank to create, edit, or import questions"
+          >
+            <HelpCircle className="w-4 h-4 text-acca-red" />
+            <span>Manage Question Bank</span>
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleLaunch} className="space-y-6">
@@ -434,7 +451,7 @@ export const ExamSetup: React.FC<ExamSetupProps> = ({
             className="flex items-center space-x-2 px-6 py-3 bg-acca-red hover:bg-acca-red-hover disabled:opacity-40 text-white font-black text-sm rounded-xl transition-all shadow-lg"
           >
             <Play className="w-4 h-4 fill-white" />
-            <span>Launch CBE Simulation ({effectiveCount} Questions)</span>
+            <span>Launch Mock Exam ({effectiveCount} Questions)</span>
           </button>
         </div>
       </form>

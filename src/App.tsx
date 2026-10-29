@@ -167,13 +167,14 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Tab: Questions */}
+      {/* Tab: Questions & Authoring (accessible via Mock Exams & question workflows) */}
       {activeTab === 'questions' && (
         <Questions
           version={activeVersion}
           questions={questions || []}
           materials={studyMaterials || []}
           onOpenPdfAtPage={handleOpenPdfAtPage}
+          onBackToMockExams={() => setActiveTab('exam-environment')}
           onOpenInWriter={(qId) => {
             setActiveWorkspaceQuestionId(qId);
             setActiveTab('word');
@@ -185,8 +186,8 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Tab: Exam Environment */}
-      {activeTab === 'exam-environment' && (
+      {/* Tab: Mock Exams (formerly Exam Environment) */}
+      {(activeTab === 'exam-environment' || activeTab === 'mock-exams') && (
         <ExamEnvironment
           version={activeVersion}
           allQuestions={questions || []}

@@ -48,6 +48,7 @@ interface QuestionsProps {
   onOpenPdfAtPage: (materialId: string, page: number) => void;
   onOpenInWriter?: (questionId: string) => void;
   onOpenInSpreadsheet?: (questionId: string) => void;
+  onBackToMockExams?: () => void;
 }
 
 export const Questions: React.FC<QuestionsProps> = ({
@@ -57,6 +58,7 @@ export const Questions: React.FC<QuestionsProps> = ({
   onOpenPdfAtPage,
   onOpenInWriter,
   onOpenInSpreadsheet,
+  onBackToMockExams,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPaper, setFilterPaper] = useState('all');
@@ -387,6 +389,17 @@ export const Questions: React.FC<QuestionsProps> = ({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {onBackToMockExams && (
+            <button
+              onClick={onBackToMockExams}
+              className="flex items-center space-x-1.5 px-3 py-2 bg-[#141419] hover:bg-[#25252e] text-gray-300 hover:text-white rounded-xl text-xs font-semibold border border-[#2a2a34] transition-all"
+              title="Return to Mock Exams"
+            >
+              <FileCheck className="w-4 h-4 text-acca-red" />
+              <span>Back to Mock Exams</span>
+            </button>
+          )}
+
           <button
             onClick={handleOpenCreate}
             className="flex items-center space-x-1.5 px-3 py-2 bg-acca-red hover:bg-acca-red-hover text-white rounded-xl text-xs font-bold transition-all shadow-xs"

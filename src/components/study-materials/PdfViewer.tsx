@@ -764,6 +764,7 @@ const PdfSinglePageView: React.FC<PdfSinglePageViewProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
   const renderTaskRef = useRef<any>(null);
+  const textLayerRenderTaskRef = useRef<any>(null);
 
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
     width: 612 * scale,
@@ -789,10 +790,15 @@ const PdfSinglePageView: React.FC<PdfSinglePageViewProps> = ({
         const context = canvas.getContext('2d');
         if (!context) return;
 
-        // Cancel previous rendering task if running
+        // Cancel previous rendering tasks if running
         if (renderTaskRef.current) {
           try {
             renderTaskRef.current.cancel();
+          } catch {}
+        }
+        if (textLayerRenderTaskRef.current) {
+          try {
+            textLayerRenderTaskRef.current.cancel();
           } catch {}
         }
 
@@ -821,12 +827,15 @@ const PdfSinglePageView: React.FC<PdfSinglePageViewProps> = ({
           const textContent = await page.getTextContent();
           if (isCancelled || !textLayerRef.current) return;
 
-          pdfjsLib.renderTextLayer({
+          textLayerRef.current.innerHTML = '';
+          const textTask = pdfjsLib.renderTextLayer({
             textContentSource: textContent,
             container: textLayerRef.current,
             viewport: viewport,
             textDivs: [],
           });
+          textLayerRenderTaskRef.current = textTask;
+          await textTask.promise;
         }
       } catch (err: any) {
         if (!isCancelled && err?.name !== 'RenderingCancelledException') {
@@ -844,6 +853,11 @@ const PdfSinglePageView: React.FC<PdfSinglePageViewProps> = ({
           renderTaskRef.current.cancel();
         } catch {}
       }
+      if (textLayerRenderTaskRef.current) {
+        try {
+          textLayerRenderTaskRef.current.cancel();
+        } catch {}
+      }
     };
   }, [pdfDoc, pageNumber, scale, isVisible]);
 
@@ -856,6 +870,7 @@ const PdfSinglePageView: React.FC<PdfSinglePageViewProps> = ({
       style={{
         width: `${dimensions.width}px`,
         minHeight: `${dimensions.height}px`,
+        ['--scale-factor' as any]: scale,
       }}
       className="relative bg-white shadow-2xl rounded-xs overflow-hidden mx-auto transition-all"
     >
@@ -876,6 +891,7 @@ const PdfSinglePageView: React.FC<PdfSinglePageViewProps> = ({
         style={{
           width: `${dimensions.width}px`,
           height: `${dimensions.height}px`,
+          ['--scale-factor' as any]: scale,
         }}
       />
 

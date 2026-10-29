@@ -5,7 +5,6 @@ import {
   CheckSquare,
   BookOpen,
   FileCheck,
-  HelpCircle,
   Table2,
   PenTool,
   TrendingUp,
@@ -119,8 +118,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       items: [
         { id: 'checklist', label: 'Study Checklist', icon: CheckSquare },
         { id: 'study-materials', label: 'Study Materials', icon: BookOpen },
-        { id: 'questions', label: 'Questions', icon: HelpCircle },
-        { id: 'exam-environment', label: 'Exam Environment', icon: FileCheck },
+        { id: 'exam-environment', label: 'Mock Exams', icon: FileCheck },
         { id: 'excel', label: 'Excel', icon: Table2 },
         { id: 'word', label: 'Word', icon: PenTool },
       ],
@@ -147,6 +145,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
   const isItemActive = (item: NavItem): boolean => {
     if (activeTab === item.id) return true;
+    if (item.id === 'exam-environment' && (activeTab === 'exam-environment' || activeTab === 'mock-exams')) return true;
     if (item.id === 'excel' && activeTab === 'excel-workspace') return true;
     if (item.id === 'word' && activeTab === 'answer-writer') return true;
     if (item.id === 'checklist' && activeTab === 'study-checklist') return true;

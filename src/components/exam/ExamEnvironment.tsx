@@ -12,7 +12,7 @@ import { ExamResults } from './ExamResults';
 import { AttemptHistoryList } from './AttemptHistoryList';
 import { prepareExamQuestions } from '../../utils/examScoring';
 import { saveExamAttempt } from '../../db';
-import { FileCheck, History } from 'lucide-react';
+import { FileCheck, History, HelpCircle } from 'lucide-react';
 
 interface ExamEnvironmentProps {
   version: QualificationVersion;
@@ -107,33 +107,46 @@ export const ExamEnvironment: React.FC<ExamEnvironmentProps> = ({
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-12">
       {/* Top Environment Mode Switcher */}
-      <div className="flex items-center space-x-2 border-b border-gray-200 pb-3">
-        <button
-          onClick={() => {
-            setActiveTab('simulator');
-            setCurrentView('setup');
-          }}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === 'simulator'
-              ? 'bg-acca-red text-white shadow-xs'
-              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-          }`}
-        >
-          <FileCheck className="w-4 h-4" />
-          <span>New Exam Simulation</span>
-        </button>
+      <div className="flex items-center justify-between border-b border-[#2a2a34] pb-3 flex-wrap gap-2">
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => {
+              setActiveTab('simulator');
+              setCurrentView('setup');
+            }}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'simulator'
+                ? 'bg-acca-red text-white shadow-xs'
+                : 'text-gray-400 hover:bg-[#25252e] hover:text-white'
+            }`}
+          >
+            <FileCheck className="w-4 h-4" />
+            <span>New Mock Exam</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === 'history'
-              ? 'bg-neutral-900 text-white shadow-xs'
-              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          <span>Attempt History ({examAttempts.length})</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'history'
+                ? 'bg-neutral-800 text-white shadow-xs'
+                : 'text-gray-400 hover:bg-[#25252e] hover:text-white'
+            }`}
+          >
+            <History className="w-4 h-4" />
+            <span>Attempt History ({examAttempts.length})</span>
+          </button>
+        </div>
+
+        {onOpenQuestionInManager && (
+          <button
+            onClick={() => onOpenQuestionInManager('')}
+            className="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#1e1e24] hover:bg-[#25252e] text-gray-300 hover:text-white border border-[#2a2a34] transition-all"
+            title="Author, import, and organize ACCA syllabus questions"
+          >
+            <HelpCircle className="w-4 h-4 text-acca-red" />
+            <span>Question Bank & Authoring</span>
+          </button>
+        )}
       </div>
 
       {activeTab === 'simulator' ? (
@@ -143,6 +156,7 @@ export const ExamEnvironment: React.FC<ExamEnvironmentProps> = ({
           materials={materials}
           defaultPaperId={defaultPaperId}
           onStartExam={handleStartExam}
+          onOpenQuestionInManager={onOpenQuestionInManager}
         />
       ) : (
         <AttemptHistoryList

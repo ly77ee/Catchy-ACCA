@@ -129,13 +129,13 @@ export const ExamResults: React.FC<ExamResultsProps> = ({
               className="px-4 py-2 text-xs font-bold rounded-xl border border-[#2a2a34] text-gray-300 hover:text-white hover:bg-[#25252e] flex items-center space-x-1.5 transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Retake Simulation</span>
+              <span>Retake Mock Exam</span>
             </button>
             <button
               onClick={onNewExam}
               className="px-4 py-2 text-xs font-bold rounded-xl bg-acca-red hover:bg-acca-red-hover text-white flex items-center space-x-1.5 transition-colors shadow-xs"
             >
-              <span>New Simulation</span>
+              <span>New Mock Exam</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

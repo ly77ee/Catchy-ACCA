@@ -500,31 +500,26 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
   };
 
   return (
-    <div className="space-y-3 max-w-7xl mx-auto pb-10">
-      {/* Top Controls Header Bar */}
-      <div className="bg-[#18181f] rounded-2xl border border-[#2a2a34] p-3 shadow-lg">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Left: Title & Paper Selector */}
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-              <Table2 className="w-5 h-5" />
+    <div className="space-y-2 max-w-7xl mx-auto pb-4 h-full flex flex-col">
+      {/* Top Controls Header Bar - Minimized & Compact */}
+      <div className="bg-[#18181f] rounded-xl border border-[#2a2a34] px-3.5 py-2 shadow-md shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {/* Left: Compact Title, Icon & Status Badge */}
+          <div className="flex items-center space-x-2 shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+              <Table2 className="w-4 h-4" />
             </div>
 
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-sm font-bold text-gray-100">Excel Workspace</h1>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[#252530] text-emerald-400 border border-emerald-500/20">
-                  FortuneSheet Engine
-                </span>
-              </div>
-              <p className="text-xs text-gray-400">
-                Official ACCA CBE calculation environment with formula calculation and multi-sheet workings
-              </p>
+            <div className="flex items-center space-x-1.5">
+              <h1 className="text-xs sm:text-sm font-bold text-gray-100">Excel Workspace</h1>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#252530] text-emerald-400 border border-emerald-500/20 hidden sm:inline">
+                FortuneSheet Engine
+              </span>
             </div>
           </div>
 
           {/* Center: Paper and Question Selectors */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
             {/* Paper Selection */}
             <select
               value={selectedPaperId}
@@ -532,7 +527,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
                 setSelectedPaperId(e.target.value);
                 setSelectedQuestionId('');
               }}
-              className="px-3 py-1.5 bg-[#22222b] border border-[#32323e] rounded-xl text-xs font-semibold text-gray-200 focus:outline-none focus:border-red-500 transition-colors"
+              className="px-2.5 py-1 bg-[#22222b] border border-[#32323e] rounded-lg text-xs font-semibold text-gray-200 focus:outline-none focus:border-red-500 transition-colors"
             >
               {version.papers.map(p => (
                 <option key={p.id} value={p.id}>
@@ -549,7 +544,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
                   setSelectedQuestionId(e.target.value);
                   if (onSelectQuestion) onSelectQuestion(e.target.value);
                 }}
-                className="px-3 py-1.5 bg-[#22222b] border border-[#32323e] rounded-xl text-xs font-semibold text-gray-200 focus:outline-none focus:border-red-500 transition-colors max-w-[220px] truncate"
+                className="px-2.5 py-1 bg-[#22222b] border border-[#32323e] rounded-lg text-xs font-semibold text-gray-200 focus:outline-none focus:border-red-500 transition-colors max-w-[200px] truncate"
               >
                 <option value="">(Standalone Scratchpad)</option>
                 {paperQuestions.map(q => (
@@ -565,33 +560,33 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
               <button
                 type="button"
                 onClick={onOpenWriter}
-                className="px-2.5 py-1.5 bg-[#22222b] hover:bg-[#2a2a36] text-gray-300 rounded-xl text-xs font-medium border border-[#32323e] flex items-center space-x-1.5 transition-colors"
+                className="px-2 py-1 bg-[#22222b] hover:bg-[#2a2a36] text-gray-300 rounded-lg text-xs font-medium border border-[#32323e] flex items-center space-x-1.5 transition-colors hidden md:inline-flex"
                 title="Switch to Answer Writer"
               >
                 <FileText className="w-3.5 h-3.5 text-red-400" />
-                <span className="hidden sm:inline">Answer Writer</span>
+                <span>Answer Writer</span>
               </button>
             )}
           </div>
 
           {/* Right: Actions, Save Indicator, CSV */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1.5 shrink-0">
             {/* Save Status Indicator */}
-            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-[#141419] border border-[#2a2a34] text-[11px] font-medium text-gray-400">
+            <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded-lg bg-[#141419] border border-[#2a2a34] text-[11px] font-medium text-gray-400">
               {saveStatus === 'saving' ? (
                 <>
-                  <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-                  <span className="text-amber-400">Saving...</span>
+                  <Clock className="w-3 h-3 text-amber-400 animate-spin" />
+                  <span className="text-amber-400 text-[10px]">Saving...</span>
                 </>
               ) : saveStatus === 'dirty' ? (
                 <>
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="text-amber-300">Unsaved</span>
+                  <AlertCircle className="w-3 h-3 text-amber-400" />
+                  <span className="text-amber-300 text-[10px]">Unsaved</span>
                 </>
               ) : (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">Saved</span>
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  <span className="text-emerald-400 text-[10px]">Saved</span>
                 </>
               )}
             </div>
@@ -600,7 +595,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
             <button
               type="button"
               onClick={handleManualSave}
-              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-colors shadow-sm"
+              className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1 transition-colors shadow-xs"
               title="Save workbook to local IndexedDB"
             >
               <Save className="w-3.5 h-3.5" />
@@ -611,7 +606,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
             <button
               type="button"
               onClick={handleResetTemplate}
-              className="p-1.5 bg-[#22222b] hover:bg-[#2a2a36] text-gray-400 hover:text-gray-200 rounded-xl border border-[#32323e] transition-colors"
+              className="p-1 bg-[#22222b] hover:bg-[#2a2a36] text-gray-400 hover:text-gray-200 rounded-lg border border-[#32323e] transition-colors"
               title="Reset to default ACCA CBE financial template"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -621,7 +616,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
             <button
               type="button"
               onClick={handleExportCsv}
-              className="p-1.5 bg-[#22222b] hover:bg-[#2a2a36] text-gray-400 hover:text-gray-200 rounded-xl border border-[#32323e] transition-colors"
+              className="p-1 bg-[#22222b] hover:bg-[#2a2a36] text-gray-400 hover:text-gray-200 rounded-lg border border-[#32323e] transition-colors"
               title="Export active sheet to CSV"
             >
               <Download className="w-3.5 h-3.5" />
@@ -629,7 +624,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
 
             {/* Import CSV */}
             <label
-              className="p-1.5 bg-[#22222b] hover:bg-[#2a2a36] text-gray-400 hover:text-gray-200 rounded-xl border border-[#32323e] transition-colors cursor-pointer"
+              className="p-1 bg-[#22222b] hover:bg-[#2a2a36] text-gray-400 hover:text-gray-200 rounded-lg border border-[#32323e] transition-colors cursor-pointer"
               title="Import CSV into new sheet"
             >
               <Upload className="w-3.5 h-3.5" />
@@ -646,7 +641,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
             <button
               type="button"
               onClick={() => setShowHelpModal(true)}
-              className="p-1.5 bg-[#22222b] hover:bg-[#2a2a36] text-gray-400 hover:text-gray-200 rounded-xl border border-[#32323e] transition-colors"
+              className="p-1 bg-[#22222b] hover:bg-[#2a2a36] text-gray-400 hover:text-gray-200 rounded-lg border border-[#32323e] transition-colors"
               title="Spreadsheet formulas & shortcuts help"
             >
               <HelpCircle className="w-3.5 h-3.5" />
@@ -656,16 +651,16 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
 
         {/* Selected Question Details Bar if active */}
         {selectedQuestion && (
-          <div className="mt-2.5 pt-2.5 border-t border-[#252530] flex flex-wrap items-center justify-between text-xs text-gray-300">
+          <div className="mt-1.5 pt-1.5 border-t border-[#252530] flex flex-wrap items-center justify-between text-[11px] text-gray-300 gap-2">
             <div className="flex items-center space-x-2">
               <span className="font-bold text-white">Linked Question:</span>
-              <span className="text-gray-300">{selectedQuestion.title}</span>
-              <span className="text-[10px] bg-red-950/40 text-red-400 border border-red-800/40 px-2 py-0.5 rounded">
+              <span className="text-gray-300 truncate max-w-sm">{selectedQuestion.title}</span>
+              <span className="text-[10px] bg-red-950/40 text-red-400 border border-red-800/40 px-1.5 py-0.2 rounded font-mono">
                 {selectedQuestion.availableMarks || 0} Marks
               </span>
             </div>
             {lastSavedTime && (
-              <span className="text-[11px] text-gray-400">
+              <span className="text-[10px] text-gray-500">
                 Last auto-saved: {new Date(lastSavedTime).toLocaleTimeString()}
               </span>
             )}
@@ -673,8 +668,8 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
         )}
       </div>
 
-      {/* Spreadsheet Workspace Main Canvas Container */}
-      <div className="w-full h-[calc(100vh-230px)] min-h-[580px] bg-[#141419] rounded-2xl border border-[#2a2a34] overflow-hidden shadow-2xl relative">
+      {/* Spreadsheet Workspace Main Canvas Container - Maximized Height */}
+      <div className="w-full flex-1 h-[calc(100vh-140px)] min-h-[620px] bg-[#141419] rounded-2xl border border-[#2a2a34] overflow-hidden shadow-2xl relative">
         {isLoading ? (
           <div className="w-full h-full flex items-center justify-center bg-[#141419] text-gray-400">
             <div className="flex flex-col items-center space-y-3">

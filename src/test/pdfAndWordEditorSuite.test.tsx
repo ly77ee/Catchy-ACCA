@@ -4,7 +4,10 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PdfViewer } from '../components/study-materials/PdfViewer';
 import { AnswerWriter } from '../components/writer/AnswerWriter';
+import { SpreadsheetWorkspace } from '../components/spreadsheet/SpreadsheetWorkspace';
 import { WorkspaceSplitLayout } from '../components/workspace/WorkspaceSplitLayout';
+import { AppLayout } from '../components/layout/AppLayout';
+import { ExamEnvironment } from '../components/exam/ExamEnvironment';
 import { db, saveAnnotation, getAnnotationsForMaterial, deleteAnnotation } from '../db';
 import { QUALIFICATION_VERSIONS } from '../config/accaStructure';
 import { StudyMaterial, DocumentAnnotation } from '../types';
@@ -439,6 +442,91 @@ describe('Catchy ACCA: PDF Viewer Continuous Scroll & Word Editor Suite', () => 
       const avgResult = evaluateFortuneFormula('=AVERAGE(A1:A3)', sheets, 4, 0);
       expect(avgResult.success).toBe(true);
       expect(avgResult.value).toBe(200);
+    });
+
+    it('renders minimized Excel Workspace header with consolidated title, badge, and no redundant paragraph', () => {
+      render(
+        <SpreadsheetWorkspace
+          version={mockVersion}
+          allQuestions={[]}
+          initialPaperId="FR"
+        />
+      );
+
+      // Compact title and badge exist
+      expect(screen.getByText('Excel Workspace')).toBeDefined();
+      expect(screen.getByText('FortuneSheet Engine')).toBeDefined();
+
+      // Redundant multi-line descriptive text is removed
+      expect(
+        screen.queryByText(/Official ACCA CBE calculation environment with formula calculation/i)
+      ).toBeNull();
+
+      // Selectors and action buttons remain fully accessible
+      expect(screen.getByDisplayValue(/FR/i)).toBeDefined();
+      expect(screen.getByText('Save')).toBeDefined();
+      expect(screen.getByTitle('Export active sheet to CSV')).toBeDefined();
+      expect(screen.getByTitle('Reset to default ACCA CBE financial template')).toBeDefined();
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /* 5. SIDEBAR NAVIGATION CLEANUP & MOCK EXAMS RENAMING                        */
+  /* -------------------------------------------------------------------------- */
+  describe('5. Sidebar Navigation Cleanup & Mock Exams Renaming', () => {
+    it('sidebar displays Mock Exams destination and has no standalone Questions item', () => {
+      const onNavigate = vi.fn();
+      render(
+        <AppLayout
+          activeTab="dashboard"
+          onNavigate={onNavigate}
+          version={mockVersion}
+          paperRecords={{}}
+          questions={[]}
+          materials={[]}
+          onOpenPdfAtPage={vi.fn()}
+          onSelectPaper={vi.fn()}
+        >
+          <div>Main Content</div>
+        </AppLayout>
+      );
+
+      // Verify Mock Exams is present in the sidebar
+      expect(screen.getByText('Mock Exams')).toBeDefined();
+
+      // Verify Questions navigation item is removed from sidebar
+      expect(screen.queryByRole('button', { name: /^Questions$/i })).toBeNull();
+
+      // Click Mock Exams navigates to 'exam-environment'
+      const mockExamsBtn = screen.getByText('Mock Exams');
+      fireEvent.click(mockExamsBtn);
+      expect(onNavigate).toHaveBeenCalledWith('exam-environment');
+    });
+
+    it('Mock Exams environment exposes Question Bank & Authoring entry point', () => {
+      const onOpenQuestionInManager = vi.fn();
+      render(
+        <ExamEnvironment
+          version={mockVersion}
+          allQuestions={[]}
+          materials={[]}
+          examAttempts={[]}
+          defaultPaperId="FR"
+          onOpenQuestionInManager={onOpenQuestionInManager}
+        />
+      );
+
+      // Verify Mock Exams header and buttons
+      expect(screen.getByText('New Mock Exam')).toBeDefined();
+      expect(screen.getByText('Configure Mock Exam')).toBeDefined();
+      expect(screen.getByText(/ACCA Mock Exams/i)).toBeDefined();
+
+      // Verify Question Bank & Authoring entry point exists and is clickable
+      const questionBankBtn = screen.getByText('Question Bank & Authoring');
+      expect(questionBankBtn).toBeDefined();
+
+      fireEvent.click(questionBankBtn);
+      expect(onOpenQuestionInManager).toHaveBeenCalled();
     });
   });
 });
