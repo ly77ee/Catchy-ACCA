@@ -86,7 +86,7 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
     content: '<p>Start typing your structured ACCA answer here...</p>',
     editorProps: {
       attributes: {
-        class: 'focus:outline-none min-h-[480px] p-6 text-gray-900 leading-relaxed font-sans',
+        class: 'focus:outline-none min-h-[480px] text-gray-900 leading-relaxed font-sans',
       },
     },
     onUpdate: () => {
@@ -183,6 +183,25 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
     });
     setSaveStatus('saved');
   };
+
+  // Synchronize incoming props if question or paper changes externally (e.g., from split-screen exam view)
+  useEffect(() => {
+    if (initialQuestionId !== undefined && initialQuestionId !== selectedQuestionId) {
+      if (editor && activeDraft && saveStatus === 'dirty') {
+        handleAutoSave();
+      }
+      setSelectedQuestionId(initialQuestionId);
+    }
+  }, [initialQuestionId]);
+
+  useEffect(() => {
+    if (initialPaperId && initialPaperId !== selectedPaperId) {
+      if (editor && activeDraft && saveStatus === 'dirty') {
+        handleAutoSave();
+      }
+      setSelectedPaperId(initialPaperId);
+    }
+  }, [initialPaperId]);
 
   // Create new version / attempt
   const handleCreateNewAttempt = async () => {
@@ -328,7 +347,10 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
           {/* Paper Selector */}
           <select
             value={selectedPaperId}
-            onChange={(e) => {
+            onChange={async (e) => {
+              if (editor && activeDraft && saveStatus === 'dirty') {
+                await handleAutoSave();
+              }
               setSelectedPaperId(e.target.value);
               setSelectedQuestionId('');
             }}
@@ -345,9 +367,13 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
           {paperQuestions.length > 0 && (
             <select
               value={selectedQuestionId}
-              onChange={(e) => {
-                setSelectedQuestionId(e.target.value);
-                if (onSelectQuestion) onSelectQuestion(e.target.value);
+              onChange={async (e) => {
+                if (editor && activeDraft && saveStatus === 'dirty') {
+                  await handleAutoSave();
+                }
+                const val = e.target.value;
+                setSelectedQuestionId(val);
+                if (onSelectQuestion) onSelectQuestion(val);
               }}
               className="px-2.5 py-1 bg-[#141419] border border-[#2a2a34] rounded-lg text-xs font-semibold text-gray-200 focus:outline-none focus:border-acca-red transition-colors max-w-[200px] truncate"
             >
@@ -724,8 +750,15 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
       </div>
 
       {/* Main Full-Height Document Canvas */}
-      <div className="flex-1 overflow-y-auto bg-[#101015] p-3 sm:p-6 flex justify-center cursor-text">
-        <div className="w-full max-w-4xl bg-white text-gray-900 rounded-lg shadow-2xl border border-gray-300 min-h-full p-6 sm:p-10 flex flex-col">
+      <div className="flex-1 overflow-y-auto bg-[#101015] p-3 sm:p-6 flex justify-center cursor-default">
+        <div
+          onClick={() => {
+            if (editor && !editor.isFocused) {
+              editor.commands.focus('end');
+            }
+          }}
+          className="w-full max-w-4xl bg-white text-gray-900 rounded-lg shadow-2xl border border-gray-300 min-h-full p-6 sm:p-10 flex flex-col cursor-text"
+        >
           <EditorContent editor={editor} className="flex-1" />
         </div>
       </div>

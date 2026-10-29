@@ -53,6 +53,11 @@ export interface FortuneSheetType {
   [key: string]: any;
 }
 
+export const DEFAULT_SHEET_ROW_COUNT = 100;
+export const DEFAULT_SHEET_COL_COUNT = 200; // Supports columns A through GR (far beyond N, Z, and AA)
+export const MAX_FORTUNESHEET_COL_COUNT = 1000; // FortuneSheet internal matrix limit (columns A through ALV)
+export const MAX_FORTUNESHEET_ROW_COUNT = 10000;
+
 /**
  * Creates default ACCA CBE financial template sheets
  */
@@ -63,8 +68,8 @@ export function createDefaultFortuneSheets(paperId: string = 'FR', title?: strin
       id: 'sheet-1',
       status: 1,
       order: 0,
-      row: 80,
-      column: 80,
+      row: DEFAULT_SHEET_ROW_COUNT,
+      column: DEFAULT_SHEET_COL_COUNT,
       celldata: [
         {
           r: 0,
@@ -97,8 +102,8 @@ export function createDefaultFortuneSheets(paperId: string = 'FR', title?: strin
       id: 'sheet-2',
       status: 0,
       order: 1,
-      row: 80,
-      column: 80,
+      row: DEFAULT_SHEET_ROW_COUNT,
+      column: DEFAULT_SHEET_COL_COUNT,
       celldata: [
         { r: 0, c: 0, v: { v: 'Accounting Notes & Basis of Preparation', m: 'Accounting Notes & Basis of Preparation', bl: 1 } },
         { r: 2, c: 0, v: { v: 'Standard', m: 'Standard', bl: 1 } },
@@ -115,7 +120,54 @@ export function createDefaultFortuneSheets(paperId: string = 'FR', title?: strin
  */
 export function spreadsheetWorkbookToFortuneSheets(wb: SpreadsheetWorkbook): FortuneSheetType[] {
   if (wb.fortuneData && Array.isArray(wb.fortuneData) && wb.fortuneData.length > 0) {
-    return wb.fortuneData;
+    return wb.fortuneData.map((sheet, idx) => {
+      // Find highest column and row index referenced in celldata or data
+      let maxReferencedCol = 0;
+      let maxReferencedRow = 0;
+      if (Array.isArray(sheet.celldata)) {
+        for (const item of sheet.celldata) {
+          if (item) {
+            if (item.c > maxReferencedCol) maxReferencedCol = item.c;
+            if (item.r > maxReferencedRow) maxReferencedRow = item.r;
+          }
+        }
+      }
+      const existingCol = sheet.column || (sheet.data && sheet.data[0] ? sheet.data[0].length : 0);
+      const existingRow = sheet.row || (sheet.data ? sheet.data.length : 0);
+
+      // Upgrade sheet dimensions so it is never artificially clamped to 14 or small values
+      const targetCol = Math.min(
+        MAX_FORTUNESHEET_COL_COUNT,
+        Math.max(existingCol, maxReferencedCol + 1, DEFAULT_SHEET_COL_COUNT)
+      );
+      const targetRow = Math.min(
+        MAX_FORTUNESHEET_ROW_COUNT,
+        Math.max(existingRow, maxReferencedRow + 1, DEFAULT_SHEET_ROW_COUNT)
+      );
+
+      // If data matrix is present and needs column expansion:
+      let data = sheet.data;
+      if (Array.isArray(data) && data.length > 0) {
+        data = data.map(row => {
+          if (!Array.isArray(row)) return row;
+          if (row.length < targetCol) {
+            const extra = Array.from({ length: targetCol - row.length }, () => null);
+            return [...row, ...extra];
+          }
+          return row;
+        });
+        while (data.length < targetRow) {
+          data.push(Array.from({ length: targetCol }, () => null));
+        }
+      }
+
+      return {
+        ...sheet,
+        row: targetRow,
+        column: targetCol,
+        data
+      };
+    });
   }
 
   if (!wb.sheets || wb.sheets.length === 0) {
@@ -124,6 +176,8 @@ export function spreadsheetWorkbookToFortuneSheets(wb: SpreadsheetWorkbook): For
 
   return wb.sheets.map((sheet, idx) => {
     const celldata: Array<{ r: number; c: number; v: FortuneCell | null }> = [];
+    let maxReferencedCol = 0;
+    let maxReferencedRow = 0;
 
     Object.entries(sheet.cells || {}).forEach(([addr, cell]) => {
       try {
@@ -131,6 +185,9 @@ export function spreadsheetWorkbookToFortuneSheets(wb: SpreadsheetWorkbook): For
         if (!parsed) return;
         const r = parsed.row; // 0-based row
         const c = parsed.col; // 0-based col
+        if (c > maxReferencedCol) maxReferencedCol = c;
+        if (r > maxReferencedRow) maxReferencedRow = r;
+
         const isFormula = typeof cell.raw === 'string' && cell.raw.startsWith('=');
         const numVal = Number(cell.raw);
         const val = isFormula
@@ -162,13 +219,22 @@ export function spreadsheetWorkbookToFortuneSheets(wb: SpreadsheetWorkbook): For
       }
     });
 
+    const targetCol = Math.min(
+      MAX_FORTUNESHEET_COL_COUNT,
+      Math.max(sheet.colCount || 0, maxReferencedCol + 1, DEFAULT_SHEET_COL_COUNT)
+    );
+    const targetRow = Math.min(
+      MAX_FORTUNESHEET_ROW_COUNT,
+      Math.max(sheet.rowCount || 0, maxReferencedRow + 1, DEFAULT_SHEET_ROW_COUNT)
+    );
+
     return {
       name: sheet.name || `Sheet ${idx + 1}`,
       id: sheet.id || `sheet-${idx + 1}`,
       status: idx === (wb.activeSheetIndex || 0) ? 1 : 0,
       order: idx,
-      row: Math.max(sheet.rowCount || 80, 80),
-      column: Math.max(sheet.colCount || 80, 80),
+      row: targetRow,
+      column: targetCol,
       celldata
     };
   });
@@ -236,12 +302,21 @@ export function fortuneSheetsToSpreadsheetWorkbook(
       }
     }
 
+    const targetRow = Math.min(
+      MAX_FORTUNESHEET_ROW_COUNT,
+      Math.max(fs.row || (fs.data ? fs.data.length : DEFAULT_SHEET_ROW_COUNT), DEFAULT_SHEET_ROW_COUNT)
+    );
+    const targetCol = Math.min(
+      MAX_FORTUNESHEET_COL_COUNT,
+      Math.max(fs.column || (fs.data && fs.data[0] ? fs.data[0].length : DEFAULT_SHEET_COL_COUNT), DEFAULT_SHEET_COL_COUNT)
+    );
+
     return {
       id: fs.id || `sheet-${idx + 1}`,
       name: fs.name || `Sheet ${idx + 1}`,
       cells,
-      rowCount: fs.row || (fs.data ? fs.data.length : 35),
-      colCount: fs.column || (fs.data && fs.data[0] ? fs.data[0].length : 14)
+      rowCount: targetRow,
+      colCount: targetCol
     };
   });
 
@@ -275,13 +350,43 @@ export function evaluateFortuneFormula(
       cellArea: { current: null },
       workbookContainer: { current: null }
     });
-    // Prepare sheets in context
+    // Prepare sheets in context with safe minimum grid dimensions
     ctx.luckysheetfile = sheets.map(s => {
-      const rowCount = s.row || 35;
-      const colCount = s.column || 14;
-      const data: Array<Array<FortuneCell | null>> = s.data || Array.from({ length: rowCount }, () =>
-        Array.from({ length: colCount }, () => null)
+      let maxReferencedCol = 0;
+      let maxReferencedRow = 0;
+      if (Array.isArray(s.celldata)) {
+        for (const item of s.celldata) {
+          if (item) {
+            if (item.c > maxReferencedCol) maxReferencedCol = item.c;
+            if (item.r > maxReferencedRow) maxReferencedRow = item.r;
+          }
+        }
+      }
+
+      const rowCount = Math.min(
+        MAX_FORTUNESHEET_ROW_COUNT,
+        Math.max(s.row || DEFAULT_SHEET_ROW_COUNT, targetRow + 1, maxReferencedRow + 1, DEFAULT_SHEET_ROW_COUNT)
       );
+      const colCount = Math.min(
+        MAX_FORTUNESHEET_COL_COUNT,
+        Math.max(s.column || DEFAULT_SHEET_COL_COUNT, targetCol + 1, maxReferencedCol + 1, DEFAULT_SHEET_COL_COUNT)
+      );
+
+      const data: Array<Array<FortuneCell | null>> = s.data
+        ? s.data.map(row => {
+            if (row.length < colCount) {
+              return [...row, ...Array.from({ length: colCount - row.length }, () => null)];
+            }
+            return row;
+          })
+        : Array.from({ length: rowCount }, () =>
+            Array.from({ length: colCount }, () => null)
+          );
+
+      // Ensure data matrix has enough rows
+      while (data.length < rowCount) {
+        data.push(Array.from({ length: colCount }, () => null));
+      }
 
       if (s.celldata) {
         for (const item of s.celldata) {
@@ -293,6 +398,8 @@ export function evaluateFortuneFormula(
 
       return {
         ...s,
+        row: rowCount,
+        column: colCount,
         data,
         status: s.status || 1
       };

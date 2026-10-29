@@ -502,8 +502,43 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 ))}
               </nav>
 
-              {/* Bottom Community & Creator Attribution */}
-              <div className="pt-3 mt-4 border-t border-[#2a2a34] space-y-3 shrink-0">
+              {/* Bottom Official Resources & Creator Attribution */}
+              <div className="pt-3 mt-4 border-t border-[#2a2a34] space-y-1.5 shrink-0">
+                <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 px-3 block mb-1">
+                  Official Resources
+                </span>
+                <a
+                  href="https://accaportal.accaglobal.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-400 hover:bg-[#25252e] hover:text-white transition-all group"
+                  title="Open ACCA Official Portal in external browser"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-acca-red" />
+                    <span>ACCA Official Portal</span>
+                  </div>
+                  <span className="text-[10px] text-gray-500 bg-[#141419] px-1.5 py-0.5 rounded border border-[#2a2a34]">
+                    Official
+                  </span>
+                </a>
+
+                <a
+                  href="https://studymaterials.accaglobal.com/account/learning-hub/my-learning/dashboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-400 hover:bg-[#25252e] hover:text-white transition-all group"
+                  title="Open ACCA Study Hub in external browser"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-acca-red" />
+                    <span>ACCA Study Hub</span>
+                  </div>
+                  <span className="text-[10px] text-gray-500 bg-[#141419] px-1.5 py-0.5 rounded border border-[#2a2a34]">
+                    Official
+                  </span>
+                </a>
+
                 <a
                   href="https://www.reddit.com/r/ACCA/"
                   target="_blank"
@@ -516,11 +551,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                     <span>r/ACCA Reddit</span>
                   </div>
                   <span className="text-[10px] text-gray-500 bg-[#141419] px-1.5 py-0.5 rounded border border-[#2a2a34]">
-                    External
+                    Community
                   </span>
                 </a>
 
-                <div className="text-center select-none pt-2 border-t border-[#2a2a34]">
+                <div className="text-center select-none pt-2.5 mt-2 border-t border-[#2a2a34]">
                   <div className="text-[11px] font-bold text-gray-300 tracking-tight">
                     Catchy ACCA <span className="text-gray-500 font-normal">· by ly77ee</span>
                   </div>

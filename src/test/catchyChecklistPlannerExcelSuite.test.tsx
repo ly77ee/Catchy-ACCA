@@ -248,18 +248,18 @@ describe('Catchy ACCA: Checklist, Planner, Excel & Navigation Improvements Suite
   /* 3. Excel Workspace: Horizontal Reachability & Active-Cell Reveal          */
   /* ========================================================================== */
   describe('3. Excel Workspace: Columns A to Z and AA+ Reachability & Active Cell Reveal', () => {
-    it('initializes FortuneSheet workbook with 80 columns and 80 rows so column Z and AA+ exist', () => {
+    it('initializes FortuneSheet workbook with at least 80 columns and 80 rows so column Z and AA+ exist', () => {
       const sheets = createDefaultFortuneSheets('FR', 'Test Question');
       expect(sheets.length).toBe(2);
       expect(sheets[0].name).toBe('Workings 1');
-      expect(sheets[0].column).toBe(80);
-      expect(sheets[0].row).toBe(80);
+      expect(sheets[0].column).toBeGreaterThanOrEqual(80);
+      expect(sheets[0].row).toBeGreaterThanOrEqual(80);
       expect(sheets[1].name).toBe('Notes & Assumptions');
-      expect(sheets[1].column).toBe(80);
-      expect(sheets[1].row).toBe(80);
+      expect(sheets[1].column).toBeGreaterThanOrEqual(80);
+      expect(sheets[1].row).toBeGreaterThanOrEqual(80);
     });
 
-    it('converts custom spreadsheet workbook to FortuneSheet sheets with 80 columns', () => {
+    it('converts custom spreadsheet workbook to FortuneSheet sheets with at least 80 columns', () => {
       const fortuneSheets = spreadsheetWorkbookToFortuneSheets({
         id: 'wb-test',
         paperId: 'FR',
@@ -281,8 +281,8 @@ describe('Catchy ACCA: Checklist, Planner, Excel & Navigation Improvements Suite
         activeSheetIndex: 0,
       });
 
-      expect(fortuneSheets[0].column).toBe(80);
-      expect(fortuneSheets[0].row).toBe(80);
+      expect(fortuneSheets[0].column).toBeGreaterThanOrEqual(80);
+      expect(fortuneSheets[0].row).toBeGreaterThanOrEqual(80);
     });
 
     it('renders SpreadsheetWorkspace with horizontal scrollbar container and formula calculation support', async () => {

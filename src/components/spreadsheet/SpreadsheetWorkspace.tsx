@@ -341,7 +341,9 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
         e.key as 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight',
         e.shiftKey,
         rangeNavigationStateRef.current,
-        editingCell
+        editingCell,
+        1000,
+        1000
       );
 
       if (result) {
@@ -382,6 +384,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
         const cMax = Math.max(result.nextState.anchor.c, result.nextState.lead.c);
 
         updateVisualRangeBox(rMin, rMax, cMin, cMax);
+        revealActiveCell(result.nextState.lead.c);
       } else {
         // Not in reference position; allow normal caret movement
         rangeNavigationStateRef.current = null;

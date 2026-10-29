@@ -91,8 +91,8 @@ export function computeNextFormulaReference(
   shiftKey: boolean,
   currentRangeState: FormulaRangeState | null,
   editingCell: ActiveCellRef,
-  maxRows: number = 100,
-  maxCols: number = 26
+  maxRows: number = 1000,
+  maxCols: number = 1000
 ): { updatedFormula: string; nextState: FormulaRangeState } | null {
   const parsed = parseFormulaReferenceState(currentFormula, editingCell);
   if (!parsed.canReference) return null;

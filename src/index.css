@@ -168,6 +168,11 @@
 .ProseMirror {
   min-height: 480px;
   outline: none;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
+  height: 100%;
 }
 
 .ProseMirror p {
