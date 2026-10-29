@@ -9,7 +9,10 @@ import {
   BackupPayload,
   ExamAttemptRecord,
   WrittenAnswerDraft,
-  SpreadsheetWorkbook
+  SpreadsheetWorkbook,
+  ChecklistRecord,
+  ChecklistItem,
+  AccaNewsItem
 } from '../types';
 
 export class CatchyAccaDatabase extends Dexie {
@@ -22,6 +25,9 @@ export class CatchyAccaDatabase extends Dexie {
   examAttempts!: Table<ExamAttemptRecord, string>;
   writtenAnswers!: Table<WrittenAnswerDraft, string>;
   spreadsheets!: Table<SpreadsheetWorkbook, string>;
+  checklists!: Table<ChecklistRecord, string>;
+  checklistItems!: Table<ChecklistItem, string>;
+  newsCache!: Table<AccaNewsItem, string>;
 
   constructor() {
     super('CatchyAccaDB');
@@ -48,6 +54,14 @@ export class CatchyAccaDatabase extends Dexie {
     // Version 4 adds sourceMaterialId index on questions for fast queries and deduplication
     this.version(4).stores({
       questions: 'id, questionNumber, paperId, sourceMaterialId, status, isDoubt, confidenceRating, createdAt, updatedAt'
+    });
+
+    // Version 5 adds checklists, checklistItems, newsCache, and authored question indices
+    this.version(5).stores({
+      questions: 'id, questionNumber, paperId, sourceMaterialId, publishStatus, syllabusArea, status, isDoubt, confidenceRating, createdAt, updatedAt',
+      checklists: 'id, paperId, qualificationVersionId, updatedAt',
+      checklistItems: 'id, checklistId, paperId, order, completed, level',
+      newsCache: 'id, publishedAt, category, isOfficial'
     });
   }
 }
@@ -352,12 +366,15 @@ export async function createBackupPayload(versionId: string): Promise<BackupPayl
   const examAttempts = await db.examAttempts.toArray();
   const writtenAnswers = await db.writtenAnswers.toArray();
   const spreadsheets = await db.spreadsheets.toArray();
+  const checklists = await db.checklists.toArray();
+  const checklistItems = await db.checklistItems.toArray();
+  const newsCache = await db.newsCache.toArray();
 
   // Strip large binary blobs from JSON backup for safety & portability
   const sanitizedMaterials = studyMaterials.map(({ pdfData, ...rest }) => rest);
 
   return {
-    version: '1.2.0',
+    version: '2.0.0',
     exportedAt: new Date().toISOString(),
     app: 'Catchy ACCA · by ly77ee',
     qualificationVersionId: versionId,
@@ -369,7 +386,10 @@ export async function createBackupPayload(versionId: string): Promise<BackupPayl
     activityLogs,
     examAttempts,
     writtenAnswers,
-    spreadsheets
+    spreadsheets,
+    checklists,
+    checklistItems,
+    newsCache
   };
 }
 
@@ -384,6 +404,8 @@ export interface RestoreValidationResult {
     attemptsCount: number;
     answersCount: number;
     spreadsheetsCount: number;
+    checklistsCount: number;
+    checklistItemsCount: number;
     exportedAt: string;
   };
 }
@@ -416,6 +438,8 @@ export function validateBackupPayload(data: unknown): RestoreValidationResult {
       attemptsCount: Array.isArray(payload.examAttempts) ? payload.examAttempts.length : 0,
       answersCount: Array.isArray(payload.writtenAnswers) ? payload.writtenAnswers.length : 0,
       spreadsheetsCount: Array.isArray(payload.spreadsheets) ? payload.spreadsheets.length : 0,
+      checklistsCount: Array.isArray(payload.checklists) ? payload.checklists.length : 0,
+      checklistItemsCount: Array.isArray(payload.checklistItems) ? payload.checklistItems.length : 0,
       exportedAt: payload.exportedAt || 'Unknown'
     }
   };
@@ -431,7 +455,10 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       db.activityLogs,
       db.examAttempts,
       db.writtenAnswers,
-      db.spreadsheets
+      db.spreadsheets,
+      db.checklists,
+      db.checklistItems,
+      db.newsCache
     ], async () => {
       await db.paperRecords.clear();
       await db.questions.clear();
@@ -441,6 +468,9 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       await db.examAttempts.clear();
       await db.writtenAnswers.clear();
       await db.spreadsheets.clear();
+      await db.checklists.clear();
+      await db.checklistItems.clear();
+      await db.newsCache.clear();
 
       if (payload.paperRecords?.length) await db.paperRecords.bulkPut(payload.paperRecords);
       if (payload.questions?.length) await db.questions.bulkPut(payload.questions);
@@ -450,6 +480,9 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       if (payload.examAttempts?.length) await db.examAttempts.bulkPut(payload.examAttempts);
       if (payload.writtenAnswers?.length) await db.writtenAnswers.bulkPut(payload.writtenAnswers);
       if (payload.spreadsheets?.length) await db.spreadsheets.bulkPut(payload.spreadsheets);
+      if (payload.checklists?.length) await db.checklists.bulkPut(payload.checklists);
+      if (payload.checklistItems?.length) await db.checklistItems.bulkPut(payload.checklistItems);
+      if (payload.newsCache?.length) await db.newsCache.bulkPut(payload.newsCache);
     });
   } else {
     // Merge mode: upsert records
@@ -460,6 +493,9 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
     if (payload.examAttempts?.length) await db.examAttempts.bulkPut(payload.examAttempts);
     if (payload.writtenAnswers?.length) await db.writtenAnswers.bulkPut(payload.writtenAnswers);
     if (payload.spreadsheets?.length) await db.spreadsheets.bulkPut(payload.spreadsheets);
+    if (payload.checklists?.length) await db.checklists.bulkPut(payload.checklists);
+    if (payload.checklistItems?.length) await db.checklistItems.bulkPut(payload.checklistItems);
+    if (payload.newsCache?.length) await db.newsCache.bulkPut(payload.newsCache);
   }
 
   await logActivity(

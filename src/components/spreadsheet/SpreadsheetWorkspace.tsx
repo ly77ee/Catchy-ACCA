@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   SpreadsheetWorkbook,
   SpreadsheetSheet,
@@ -9,6 +9,8 @@ import {
 } from '../../types';
 import {
   colIndexToLetter,
+  colLetterToIndex,
+  parseCellAddress,
   formatCellValue,
   recomputeSheet,
   recomputeWorkbook,
@@ -25,15 +27,13 @@ import {
   DollarSign,
   Percent,
   Bold,
-  Calculator,
   RotateCcw,
   Undo2,
   Redo2,
-  FileSpreadsheet,
   Save,
   Copy,
   Check,
-  ChevronRight
+  CheckSquare
 } from 'lucide-react';
 
 interface SpreadsheetWorkspaceProps {
@@ -60,9 +60,18 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
   const [workbook, setWorkbook] = useState<SpreadsheetWorkbook | null>(null);
   const [activeSheetIndex, setActiveSheetIndex] = useState<number>(0);
   const [selectedCell, setSelectedCell] = useState<string>('A1');
+  const [selectionRange, setSelectionRange] = useState<{ start: string; end: string } | null>(null);
+  const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
+
+  // In-cell / Formula bar editing
   const [editingFormula, setEditingFormula] = useState<string>('');
-  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [isInlineEditing, setIsInlineEditing] = useState<boolean>(false);
+  const [inlineValue, setInlineValue] = useState<string>('');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'dirty'>('saved');
+
+  // Column Resizing state
+  const [colWidths, setColWidths] = useState<Record<number, number>>({});
+  const resizingColRef = useRef<{ colIdx: number; startX: number; startWidth: number } | null>(null);
 
   // History for undo/redo
   const [undoStack, setUndoStack] = useState<SpreadsheetSheet[]>([]);
@@ -70,12 +79,13 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const formulaInputRef = useRef<HTMLInputElement | null>(null);
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
+  const inlineInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load workbook from IndexedDB
   useEffect(() => {
     const loadWorkbook = async () => {
-      let query = db.spreadsheets.where('paperId').equals(selectedPaperId);
-      let list = await query.toArray();
+      let list = await db.spreadsheets.where('paperId').equals(selectedPaperId).toArray();
 
       if (selectedQuestionId) {
         list = list.filter(w => w.questionId === selectedQuestionId);
@@ -85,34 +95,36 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
         setWorkbook(list[0]);
         setActiveSheetIndex(list[0].activeSheetIndex || 0);
       } else {
-        // Create initial default workbook
+        // Create initial default workbook with practical ACCA CBE template
         const initialSheet: SpreadsheetSheet = {
           id: 'sheet-1',
           name: 'Workings 1',
           cells: {
-            A1: { raw: 'ACC A CBE Workings Schedule', format: 'header' },
-            A3: { raw: 'Item' },
-            B3: { raw: 'Amount ($)', format: 'header' },
+            A1: { raw: 'ACCA CBE Financial Workings Schedule', format: 'header' },
+            A3: { raw: 'Line Item', format: 'bold' },
+            B3: { raw: 'Amount ($)', format: 'bold' },
             A4: { raw: 'Consideration Transferred' },
             B4: { raw: '120000', format: 'currency' },
-            A5: { raw: 'Fair Value of NCI' },
+            A5: { raw: 'Fair Value of Non-Controlling Interest (NCI)' },
             B5: { raw: '30000', format: 'currency' },
-            A6: { raw: 'Total Value' },
+            A6: { raw: 'Total Aggregate Value' },
             B6: { raw: '=SUM(B4:B5)', format: 'currency' },
-            A7: { raw: 'Net Assets Acquired' },
+            A7: { raw: 'Net Identifiable Assets Acquired' },
             B7: { raw: '110000', format: 'currency' },
-            A8: { raw: 'Goodwill at Acquisition' },
+            A8: { raw: 'Goodwill on Acquisition' },
             B8: { raw: '=B6-B7', format: 'currency' },
+            A10: { raw: 'Status Check' },
+            B10: { raw: '=IF(B8>0,"Positive Goodwill","Bargain Purchase")' }
           },
-          rowCount: 30,
-          colCount: 10
+          rowCount: 35,
+          colCount: 12
         };
 
         const initialWb: SpreadsheetWorkbook = {
           id: 'wb-' + Date.now(),
           questionId: selectedQuestionId || undefined,
           paperId: selectedPaperId,
-          title: `${selectedPaperId} Financial Workings`,
+          title: `${selectedPaperId} Workings Workbook`,
           activeSheetIndex: 0,
           sheets: [recomputeSheet(initialSheet)],
           createdAt: new Date().toISOString(),
@@ -131,17 +143,25 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
 
   const activeSheet = workbook?.sheets[activeSheetIndex] || {
     id: 'sheet-empty',
-    name: 'Workings',
+    name: 'Workings 1',
     cells: {},
-    rowCount: 25,
-    colCount: 8
+    rowCount: 35,
+    colCount: 12
   };
 
-  // Sync active cell raw text with formula bar
+  // Sync active cell raw text with formula bar & inline value
   useEffect(() => {
     const rawVal = activeSheet.cells[selectedCell]?.raw || '';
     setEditingFormula(rawVal);
+    setInlineValue(rawVal);
   }, [selectedCell, activeSheet]);
+
+  // Focus inline editor when activated
+  useEffect(() => {
+    if (isInlineEditing) {
+      inlineInputRef.current?.focus();
+    }
+  }, [isInlineEditing]);
 
   // Push state to undo stack
   const pushUndoState = () => {
@@ -206,6 +226,103 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
     setSaveStatus('saved');
   };
 
+  // Keyboard Navigation & Editing Handler
+  const handleKeyDown = useCallback(
+    async (e: React.KeyboardEvent) => {
+      if (isInlineEditing) return; // Allow normal typing in inline input
+
+      const parsed = parseCellAddress(selectedCell);
+      if (!parsed) return;
+
+      const { col, row } = parsed;
+
+      // Copy: Ctrl+C / Cmd+C
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        const rawVal = activeSheet.cells[selectedCell]?.raw || '';
+        navigator.clipboard.writeText(rawVal);
+        return;
+      }
+
+      // Paste: Ctrl+V / Cmd+V
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text) {
+            const rows = text.split(/\r?\n/).filter(r => r.length > 0);
+            if (rows.length === 1 && !rows[0].includes('\t')) {
+              await updateCellValue(selectedCell, rows[0]);
+            } else {
+              // Multi-cell tabular paste
+              pushUndoState();
+              const newCells = { ...activeSheet.cells };
+              for (let rOffset = 0; rOffset < rows.length; rOffset++) {
+                const cols = rows[rOffset].split('\t');
+                for (let cOffset = 0; cOffset < cols.length; cOffset++) {
+                  const targetColLetter = colIndexToLetter(col + cOffset);
+                  const targetAddr = `${targetColLetter}${row + rOffset + 1}`;
+                  newCells[targetAddr] = {
+                    ...(newCells[targetAddr] || {}),
+                    raw: cols[cOffset]
+                  };
+                }
+              }
+              const updatedSheets = [...workbook!.sheets];
+              updatedSheets[activeSheetIndex] = { ...activeSheet, cells: newCells };
+              const updatedWb = recomputeWorkbook({ ...workbook!, sheets: updatedSheets });
+              setWorkbook(updatedWb);
+              await db.spreadsheets.put(updatedWb);
+            }
+          }
+        } catch (err) {
+          console.warn('Clipboard read error:', err);
+        }
+        return;
+      }
+
+      // Undo: Ctrl+Z / Cmd+Z
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) handleRedo();
+        else handleUndo();
+        return;
+      }
+
+      // Arrow navigation
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (row > 0) setSelectedCell(`${colIndexToLetter(col)}${row}`);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (row < activeSheet.rowCount - 1) setSelectedCell(`${colIndexToLetter(col)}${row + 2}`);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (col > 0) setSelectedCell(`${colIndexToLetter(col - 1)}${row + 1}`);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (col < activeSheet.colCount - 1) setSelectedCell(`${colIndexToLetter(col + 1)}${row + 1}`);
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (col > 0) setSelectedCell(`${colIndexToLetter(col - 1)}${row + 1}`);
+        } else {
+          if (col < activeSheet.colCount - 1) setSelectedCell(`${colIndexToLetter(col + 1)}${row + 1}`);
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        setIsInlineEditing(true);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        updateCellValue(selectedCell, '');
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Direct typing into selected cell: activate inline editing and set initial character
+        setIsInlineEditing(true);
+        setInlineValue(e.key);
+      }
+    },
+    [selectedCell, activeSheet, isInlineEditing, workbook, activeSheetIndex]
+  );
+
   // Apply format to selected cell
   const handleApplyFormat = async (format: CellFormat) => {
     if (!workbook) return;
@@ -233,117 +350,103 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
     await db.spreadsheets.put(updatedWb);
   };
 
-  // Insert financial statement template
-  const handleApplyTemplate = async (templateName: string) => {
-    if (!workbook) return;
-    if (!window.confirm(`Apply "${templateName}" template to current worksheet? (Will replace current sheet data)`)) {
-      return;
-    }
-
-    pushUndoState();
-    let templateCells: Record<string, CellData> = {};
-
-    if (templateName === 'npv') {
-      templateCells = {
-        A1: { raw: 'Investment Appraisal — Net Present Value (NPV)', format: 'header' },
-        A3: { raw: 'Discount Rate' },
-        B3: { raw: '0.10', format: 'percent' },
-        A5: { raw: 'Year', format: 'header' },
-        B5: { raw: 'Cash Flow ($)', format: 'header' },
-        C5: { raw: 'Discount Factor', format: 'header' },
-        D5: { raw: 'Present Value ($)', format: 'header' },
-        A6: { raw: '0' },
-        B6: { raw: '-100000', format: 'currency' },
-        C6: { raw: '1.000', format: 'number' },
-        D6: { raw: '=B6*C6', format: 'currency' },
-        A7: { raw: '1' },
-        B7: { raw: '35000', format: 'currency' },
-        C7: { raw: '=ROUND(1/(1+$B$3)^A7, 3)', format: 'number' },
-        D7: { raw: '=B7*C7', format: 'currency' },
-        A8: { raw: '2' },
-        B8: { raw: '45000', format: 'currency' },
-        C8: { raw: '=ROUND(1/(1+$B$3)^A8, 3)', format: 'number' },
-        D8: { raw: '=B8*C8', format: 'currency' },
-        A9: { raw: '3' },
-        B9: { raw: '50000', format: 'currency' },
-        C9: { raw: '=ROUND(1/(1+$B$3)^A9, 3)', format: 'number' },
-        D9: { raw: '=B9*C9', format: 'currency' },
-        A11: { raw: 'Net Present Value (NPV)' },
-        D11: { raw: '=SUM(D6:D9)', format: 'currency' },
-      };
-    } else if (templateName === 'balance_sheet') {
-      templateCells = {
-        A1: { raw: 'Statement of Financial Position (Balance Sheet)', format: 'header' },
-        A3: { raw: 'Non-Current Assets', format: 'header' },
-        B3: { raw: 'Amount ($)', format: 'header' },
-        A4: { raw: 'Property, Plant & Equipment' },
-        B4: { raw: '240000', format: 'currency' },
-        A5: { raw: 'Goodwill on Acquisition' },
-        B5: { raw: '40000', format: 'currency' },
-        A6: { raw: 'Total Non-Current Assets' },
-        B6: { raw: '=SUM(B4:B5)', format: 'currency' },
-        A8: { raw: 'Current Assets', format: 'header' },
-        A9: { raw: 'Inventories' },
-        B9: { raw: '32000', format: 'currency' },
-        A10: { raw: 'Trade Receivables' },
-        B10: { raw: '45000', format: 'currency' },
-        A11: { raw: 'Cash & Cash Equivalents' },
-        B11: { raw: '18000', format: 'currency' },
-        A12: { raw: 'Total Current Assets' },
-        B12: { raw: '=SUM(B9:B11)', format: 'currency' },
-        A14: { raw: 'Total Assets' },
-        B14: { raw: '=B6+B12', format: 'currency' },
-      };
-    }
-
-    const newSheet = recomputeSheet({
-      ...activeSheet,
-      cells: templateCells,
-      rowCount: 30,
-      colCount: 10
-    });
-
-    const updatedSheets = [...workbook.sheets];
-    updatedSheets[activeSheetIndex] = newSheet;
-    const updatedWb = { ...workbook, sheets: updatedSheets };
-    setWorkbook(updatedWb);
-    await db.spreadsheets.put(updatedWb);
-    await logActivity('Spreadsheet Template Applied', `Applied ${templateName} template`, 'workspace');
-  };
-
-  // Add new sheet
+  // Add worksheet
   const handleAddSheet = async () => {
     if (!workbook) return;
-    const nextIdx = workbook.sheets.length + 1;
+    pushUndoState();
+
+    const newIndex = workbook.sheets.length + 1;
     const newSheet: SpreadsheetSheet = {
       id: 'sheet-' + Date.now(),
-      name: `Sheet ${nextIdx}`,
+      name: `Sheet ${newIndex}`,
       cells: {},
-      rowCount: 30,
-      colCount: 10
+      rowCount: 35,
+      colCount: 12
     };
 
+    const updatedSheets = [...workbook.sheets, newSheet];
     const updatedWb: SpreadsheetWorkbook = {
       ...workbook,
-      sheets: [...workbook.sheets, newSheet],
-      activeSheetIndex: workbook.sheets.length,
-      updatedAt: new Date().toISOString()
+      sheets: updatedSheets,
+      activeSheetIndex: updatedSheets.length - 1
     };
 
     setWorkbook(updatedWb);
-    setActiveSheetIndex(workbook.sheets.length);
+    setActiveSheetIndex(updatedSheets.length - 1);
+    setSelectedCell('A1');
     await db.spreadsheets.put(updatedWb);
+  };
+
+  // Rename worksheet
+  const handleRenameSheet = async (index: number) => {
+    if (!workbook) return;
+    const currentName = workbook.sheets[index].name;
+    const newName = window.prompt('Enter new worksheet name:', currentName);
+    if (!newName || newName.trim() === '' || newName === currentName) return;
+
+    pushUndoState();
+    const updatedSheets = [...workbook.sheets];
+    updatedSheets[index] = { ...updatedSheets[index], name: newName.trim() };
+    const updatedWb = { ...workbook, sheets: updatedSheets };
+
+    setWorkbook(updatedWb);
+    await db.spreadsheets.put(updatedWb);
+  };
+
+  // Delete worksheet
+  const handleDeleteSheet = async (index: number) => {
+    if (!workbook || workbook.sheets.length <= 1) {
+      alert('A workbook must have at least one worksheet.');
+      return;
+    }
+    if (!window.confirm(`Delete worksheet "${workbook.sheets[index].name}"?`)) return;
+
+    pushUndoState();
+    const updatedSheets = workbook.sheets.filter((_, i) => i !== index);
+    const updatedWb: SpreadsheetWorkbook = {
+      ...workbook,
+      sheets: updatedSheets,
+      activeSheetIndex: Math.min(activeSheetIndex, updatedSheets.length - 1)
+    };
+
+    setWorkbook(updatedWb);
+    setActiveSheetIndex(Math.min(activeSheetIndex, updatedSheets.length - 1));
+    await db.spreadsheets.put(updatedWb);
+  };
+
+  // Column Resizing mouse handlers
+  const handleResizeMouseDown = (colIdx: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const currentWidth = colWidths[colIdx] || 110;
+    resizingColRef.current = { colIdx, startX: e.clientX, startWidth: currentWidth };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!resizingColRef.current) return;
+      const delta = moveEvent.clientX - resizingColRef.current.startX;
+      const newWidth = Math.max(50, resizingColRef.current.startWidth + delta);
+      setColWidths(prev => ({ ...prev, [resizingColRef.current!.colIdx]: newWidth }));
+    };
+
+    const handleMouseUp = () => {
+      resizingColRef.current = null;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
   };
 
   // Export CSV
   const handleExportCsv = () => {
-    const csvData = exportSheetToCsv(activeSheet);
-    const blob = new Blob([csvData], { type: 'text/csv' });
+    const csv = exportSheetToCsv(activeSheet);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `catchy-acca-${selectedPaperId}-${activeSheet.name.replace(/\s+/g, '_')}.csv`;
-    a.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${activeSheet.name.replace(/\s+/g, '_')}_workings.csv`;
+    link.click();
     URL.revokeObjectURL(url);
   };
 
@@ -353,145 +456,102 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
     if (!file || !workbook) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const text = event.target?.result as string;
-        const imported = importCsvToSheet(text, file.name.replace(/\.csv$/i, ''));
-        const updatedWb: SpreadsheetWorkbook = {
+    reader.onload = async (evt) => {
+      const content = evt.target?.result as string;
+      if (content) {
+        pushUndoState();
+        const importedSheet = importCsvToSheet(content, file.name.replace('.csv', ''));
+        const updatedSheets = [...workbook.sheets, importedSheet];
+        const updatedWb = {
           ...workbook,
-          sheets: [...workbook.sheets, imported],
-          activeSheetIndex: workbook.sheets.length,
-          updatedAt: new Date().toISOString()
+          sheets: updatedSheets,
+          activeSheetIndex: updatedSheets.length - 1
         };
         setWorkbook(updatedWb);
-        setActiveSheetIndex(workbook.sheets.length);
+        setActiveSheetIndex(updatedSheets.length - 1);
         await db.spreadsheets.put(updatedWb);
-        alert(`Successfully imported "${file.name}" as a new worksheet!`);
-      } catch (err: any) {
-        alert('Failed to parse CSV file: ' + err.message);
       }
     };
     reader.readAsText(file);
+    e.target.value = '';
   };
-
-  // Keyboard navigation across grid
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (isEditing) {
-      if (e.key === 'Enter') {
-        setIsEditing(false);
-        updateCellValue(selectedCell, editingFormula);
-      } else if (e.key === 'Escape') {
-        setIsEditing(false);
-        setEditingFormula(activeSheet.cells[selectedCell]?.raw || '');
-      }
-      return;
-    }
-
-    const coord = activeSheet.cells[selectedCell] ? selectedCell : 'A1';
-    const colMatch = coord.match(/^([A-Z]+)(\d+)$/);
-    if (!colMatch) return;
-
-    let colLetter = colMatch[1];
-    let rowNum = parseInt(colMatch[2], 10);
-    let colIdx = colLetter.charCodeAt(0) - 65;
-
-    if (e.key === 'ArrowUp' && rowNum > 1) {
-      e.preventDefault();
-      setSelectedCell(`${colLetter}${rowNum - 1}`);
-    } else if (e.key === 'ArrowDown' && rowNum < activeSheet.rowCount) {
-      e.preventDefault();
-      setSelectedCell(`${colLetter}${rowNum + 1}`);
-    } else if (e.key === 'ArrowLeft' && colIdx > 0) {
-      e.preventDefault();
-      setSelectedCell(`${colIndexToLetter(colIdx - 1)}${rowNum}`);
-    } else if (e.key === 'ArrowRight' && colIdx < activeSheet.colCount - 1) {
-      e.preventDefault();
-      setSelectedCell(`${colIndexToLetter(colIdx + 1)}${rowNum}`);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      setIsEditing(true);
-      formulaInputRef.current?.focus();
-    }
-  };
-
-  const paperQuestions = allQuestions.filter(q => q.paperId === selectedPaperId);
-  const selectedQuestion = allQuestions.find(q => q.id === selectedQuestionId);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Header Bar */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-acca-red bg-red-50 px-2.5 py-0.5 rounded-full">
-              Financial Calculation Engine
-            </span>
-            <span className="text-xs text-gray-400">ACCA CBE Spreadsheet Specs</span>
+    <div className="space-y-4">
+      {/* Top Header / Ribbon */}
+      <div className="bg-[#1e1e24] p-4 rounded-2xl border border-[#2a2a34] flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3">
+          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <Table2 className="w-5 h-5" />
           </div>
-          <h1 className="text-2xl font-extrabold text-gray-900 mt-1">
-            Excel Spreadsheet Workspace
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Full formula arithmetic, ranges, financial functions (SUM, NPV, IRR, PMT, IF), multi-sheet workbooks, and CSV exchange.
-          </p>
+          <div>
+            <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+              ACCA Spreadsheet Workspace
+              <span className="text-[11px] font-semibold bg-[#141419] text-emerald-400 px-2 py-0.5 rounded-md border border-[#2a2a34]">
+                Financial Calculation Grid
+              </span>
+            </h1>
+            <p className="text-xs text-gray-400 mt-0.5">
+              CBE exam spreadsheet simulator with live financial formulas (NPV, IRR, PMT), multi-cell editing, and auto-save
+            </p>
+          </div>
         </div>
 
-        {/* Paper & Question Selectors */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Paper & Question selector */}
+        <div className="flex items-center space-x-2">
           <select
             value={selectedPaperId}
-            onChange={(e) => {
+            onChange={e => {
               setSelectedPaperId(e.target.value);
               setSelectedQuestionId('');
             }}
-            className="text-xs font-bold border border-gray-300 rounded-xl px-3 py-2 bg-white text-gray-900 outline-none focus:border-acca-red"
+            className="bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-acca-red font-bold"
           >
             {version.papers.map(p => (
-              <option key={p.id} value={p.id}>{p.id} — {p.name}</option>
-            ))}
-          </select>
-
-          <select
-            value={selectedQuestionId}
-            onChange={(e) => setSelectedQuestionId(e.target.value)}
-            className="text-xs font-medium border border-gray-300 rounded-xl px-3 py-2 bg-white text-gray-700 outline-none focus:border-acca-red max-w-xs truncate"
-          >
-            <option value="">General Workings (No linked question)</option>
-            {paperQuestions.map(q => (
-              <option key={q.id} value={q.id}>
-                {q.questionNumber}: {q.title}
+              <option key={p.id} value={p.id}>
+                {p.id} — {p.name}
               </option>
             ))}
           </select>
 
-          {onOpenWriter && (
-            <button
-              onClick={onOpenWriter}
-              className="text-xs font-bold bg-neutral-900 hover:bg-black text-white px-3 py-2 rounded-xl transition-colors"
+          {allQuestions.length > 0 && (
+            <select
+              value={selectedQuestionId}
+              onChange={e => setSelectedQuestionId(e.target.value)}
+              className="bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-acca-red max-w-[200px] truncate"
             >
-              Open Answer Writer
-            </button>
+              <option value="">Standalone Workbook</option>
+              {allQuestions
+                .filter(q => q.paperId === selectedPaperId)
+                .map(q => (
+                  <option key={q.id} value={q.id}>
+                    {q.questionNumber}: {q.title}
+                  </option>
+                ))}
+            </select>
           )}
         </div>
       </div>
 
-      {/* Main Grid Container */}
+      {/* Spreadsheet Main Container */}
       <div
-        className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden flex flex-col"
-        onKeyDown={handleKeyDown}
+        ref={gridContainerRef}
         tabIndex={0}
+        onKeyDown={handleKeyDown}
+        className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] overflow-hidden flex flex-col shadow-xl outline-none focus:border-[#404050]"
       >
         {/* Toolbar & Formula Bar */}
-        <div className="bg-gray-50 border-b border-gray-200 p-2.5 space-y-2 select-none">
-          {/* Top Button Ribbon */}
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="p-3 bg-[#18181e] border-b border-[#2a2a34] space-y-2 select-none">
+          {/* Action pills */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center space-x-1.5">
+              {/* Undo / Redo */}
               <button
                 type="button"
                 onClick={handleUndo}
                 disabled={undoStack.length === 0}
-                className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 text-gray-700"
-                title="Undo"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#25252e] disabled:opacity-25"
+                title="Undo (Ctrl+Z)"
               >
                 <Undo2 className="w-4 h-4" />
               </button>
@@ -499,22 +559,35 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
                 type="button"
                 onClick={handleRedo}
                 disabled={redoStack.length === 0}
-                className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 text-gray-700"
-                title="Redo"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#25252e] disabled:opacity-25"
+                title="Redo (Ctrl+Shift+Z)"
               >
                 <Redo2 className="w-4 h-4" />
               </button>
 
-              <span className="w-px h-5 bg-gray-300 mx-1" />
+              <span className="w-px h-4 bg-[#2a2a34] mx-1" />
 
-              {/* Number formatting pills */}
+              {/* Formatting buttons */}
+              <button
+                type="button"
+                onClick={() => handleApplyFormat('bold')}
+                className={`p-1.5 rounded-lg font-bold transition-colors ${
+                  activeSheet.cells[selectedCell]?.format === 'bold'
+                    ? 'bg-acca-red text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-[#25252e]'
+                }`}
+                title="Bold"
+              >
+                <Bold className="w-4 h-4" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => handleApplyFormat('currency')}
-                className={`p-1.5 rounded font-bold transition-colors ${
+                className={`p-1.5 rounded-lg font-bold transition-colors ${
                   activeSheet.cells[selectedCell]?.format === 'currency'
-                    ? 'bg-neutral-900 text-white'
-                    : 'hover:bg-gray-200 text-gray-700'
+                    ? 'bg-acca-red text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-[#25252e]'
                 }`}
                 title="Format Currency ($)"
               >
@@ -524,10 +597,10 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
               <button
                 type="button"
                 onClick={() => handleApplyFormat('percent')}
-                className={`p-1.5 rounded font-bold transition-colors ${
+                className={`p-1.5 rounded-lg font-bold transition-colors ${
                   activeSheet.cells[selectedCell]?.format === 'percent'
-                    ? 'bg-neutral-900 text-white'
-                    : 'hover:bg-gray-200 text-gray-700'
+                    ? 'bg-acca-red text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-[#25252e]'
                 }`}
                 title="Format Percentage (%)"
               >
@@ -536,49 +609,32 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
 
               <button
                 type="button"
-                onClick={() => handleApplyFormat('bold')}
-                className={`p-1.5 rounded font-bold transition-colors ${
-                  activeSheet.cells[selectedCell]?.format === 'bold'
-                    ? 'bg-neutral-900 text-white'
-                    : 'hover:bg-gray-200 text-gray-700'
+                onClick={() => handleApplyFormat('header')}
+                className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors ${
+                  activeSheet.cells[selectedCell]?.format === 'header'
+                    ? 'bg-acca-red text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-[#25252e]'
                 }`}
-                title="Bold"
+                title="Header Style"
               >
-                <Bold className="w-4 h-4" />
+                Header
               </button>
-
-              <span className="w-px h-5 bg-gray-300 mx-1" />
-
-              {/* Template Presets */}
-              <select
-                onChange={(e) => {
-                  if (e.target.value) {
-                    handleApplyTemplate(e.target.value);
-                    e.target.value = '';
-                  }
-                }}
-                className="text-xs font-semibold bg-white border border-gray-300 rounded-lg px-2 py-1 text-gray-700 outline-none"
-              >
-                <option value="">ACCA Layout Templates...</option>
-                <option value="npv">Investment Appraisal (NPV & Cash Flows)</option>
-                <option value="balance_sheet">Statement of Financial Position (Balance Sheet)</option>
-              </select>
             </div>
 
-            {/* CSV Import / Export */}
+            {/* Save & CSV Actions */}
             <div className="flex items-center space-x-2">
-              <span className="text-[11px] font-bold text-gray-400">
+              <span className="text-[11px] font-semibold text-gray-500">
                 {saveStatus === 'saving' ? 'Saving...' : 'Autosaved'}
               </span>
 
               <button
                 type="button"
                 onClick={handleExportCsv}
-                className="p-1.5 text-gray-700 hover:bg-gray-200 rounded flex items-center space-x-1 font-semibold"
+                className="px-2.5 py-1 text-xs text-gray-300 hover:text-white bg-[#141419] hover:bg-[#25252e] border border-[#2a2a34] rounded-lg flex items-center space-x-1"
                 title="Export Sheet to CSV"
               >
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Export CSV</span>
+                <Download className="w-3.5 h-3.5" />
+                <span>Export CSV</span>
               </button>
 
               <input
@@ -591,67 +647,74 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="p-1.5 text-gray-700 hover:bg-gray-200 rounded flex items-center space-x-1 font-semibold"
+                className="px-2.5 py-1 text-xs text-gray-300 hover:text-white bg-[#141419] hover:bg-[#25252e] border border-[#2a2a34] rounded-lg flex items-center space-x-1"
                 title="Import CSV into new sheet"
               >
-                <Upload className="w-4 h-4" />
-                <span className="hidden sm:inline">Import CSV</span>
+                <Upload className="w-3.5 h-3.5" />
+                <span>Import CSV</span>
               </button>
             </div>
           </div>
 
           {/* Formula Bar fx */}
-          <div className="flex items-center space-x-2 bg-white border border-gray-300 rounded-xl px-3 py-1.5">
-            <span className="font-bold text-gray-700 text-xs w-10 text-center select-none border-r border-gray-200 pr-2">
+          <div className="flex items-center space-x-2 bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-1.5">
+            <span className="font-mono font-bold text-white text-xs w-12 text-center select-none border-r border-[#2a2a34] pr-2">
               {selectedCell}
             </span>
-            <span className="text-gray-400 font-mono font-bold text-xs select-none">
+            <span className="text-gray-500 font-mono font-bold text-xs select-none">
               fx
             </span>
             <input
               ref={formulaInputRef}
               type="text"
               value={editingFormula}
-              onChange={(e) => setEditingFormula(e.target.value)}
-              onFocus={() => setIsEditing(true)}
-              onBlur={() => {
-                setIsEditing(false);
-                updateCellValue(selectedCell, editingFormula);
-              }}
-              onKeyDown={(e) => {
+              onChange={e => setEditingFormula(e.target.value)}
+              onBlur={() => updateCellValue(selectedCell, editingFormula)}
+              onKeyDown={e => {
                 if (e.key === 'Enter') {
+                  updateCellValue(selectedCell, editingFormula);
                   formulaInputRef.current?.blur();
+                  gridContainerRef.current?.focus();
                 }
               }}
-              placeholder="Enter value or formula e.g. =SUM(A1:A5), =NPV(0.1, B6:B9)..."
-              className="flex-1 font-mono text-xs text-gray-900 outline-none"
+              placeholder="Enter value or formula e.g. =SUM(A1:A5), =A1+B1, =IF(A1>100,'Pass','Fail'), =SUM(B2:B10)*10%, =NPV(0.1, B6:B9)..."
+              className="flex-1 font-mono text-xs text-white bg-transparent outline-none placeholder-gray-600"
             />
           </div>
         </div>
 
-        {/* Scrollable Spreadsheet Grid */}
-        <div className="overflow-auto max-h-[520px] relative border-b border-gray-200">
-          <table className="border-collapse table-fixed text-xs font-sans select-none min-w-full">
+        {/* Scrollable Spreadsheet Table Grid */}
+        <div className="overflow-auto max-h-[540px] relative border-b border-[#2a2a34] bg-[#141419]">
+          <table className="border-collapse table-fixed text-xs font-mono select-none min-w-full">
             <thead>
-              <tr className="bg-gray-100 text-gray-600 sticky top-0 z-20">
-                <th className="w-12 h-7 border border-gray-300 bg-gray-200 text-center text-[10px] font-bold" />
-                {Array.from({ length: activeSheet.colCount }).map((_, cIdx) => (
-                  <th
-                    key={cIdx}
-                    className="min-w-[110px] h-7 border border-gray-300 px-2 font-bold text-center text-gray-700"
-                  >
-                    {colIndexToLetter(cIdx)}
-                  </th>
-                ))}
+              <tr className="bg-[#18181e] text-gray-400 sticky top-0 z-20">
+                <th className="w-12 h-7 border border-[#2a2a34] bg-[#1a1a20] text-center text-[10px] font-bold text-gray-500" />
+                {Array.from({ length: activeSheet.colCount }).map((_, cIdx) => {
+                  const width = colWidths[cIdx] || 110;
+                  return (
+                    <th
+                      key={cIdx}
+                      style={{ width: `${width}px`, minWidth: `${width}px` }}
+                      className="h-7 border border-[#2a2a34] px-2 font-bold text-center text-gray-300 relative group"
+                    >
+                      {colIndexToLetter(cIdx)}
+                      {/* Resize Handle */}
+                      <div
+                        onMouseDown={e => handleResizeMouseDown(cIdx, e)}
+                        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-acca-red group-hover:bg-[#353542]"
+                      />
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
               {Array.from({ length: activeSheet.rowCount }).map((_, rIdx) => {
                 const rowNum = rIdx + 1;
                 return (
-                  <tr key={rowNum} className="hover:bg-gray-50/40">
+                  <tr key={rowNum} className="hover:bg-[#1a1a22]">
                     {/* Row Header */}
-                    <td className="w-12 h-7 border border-gray-300 bg-gray-100 text-center font-bold text-[10px] text-gray-500 sticky left-0 z-10">
+                    <td className="w-12 h-7 border border-[#2a2a34] bg-[#18181e] text-center font-bold text-[10px] text-gray-500 sticky left-0 z-10">
                       {rowNum}
                     </td>
 
@@ -660,28 +723,61 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
                       const addr = `${colIndexToLetter(cIdx)}${rowNum}`;
                       const cell = activeSheet.cells[addr];
                       const isSelected = selectedCell === addr;
-                      const formattedDisplay = formatCellValue(cell?.computed !== undefined ? cell.computed : cell?.raw, cell?.format);
+                      const formattedDisplay = formatCellValue(
+                        cell?.computed !== undefined ? cell.computed : cell?.raw,
+                        cell?.format
+                      );
 
                       return (
                         <td
                           key={addr}
-                          onClick={() => setSelectedCell(addr)}
+                          onClick={() => {
+                            setSelectedCell(addr);
+                            setIsInlineEditing(false);
+                          }}
                           onDoubleClick={() => {
                             setSelectedCell(addr);
-                            setIsEditing(true);
-                            formulaInputRef.current?.focus();
+                            setIsInlineEditing(true);
+                            setInlineValue(cell?.raw || '');
                           }}
-                          className={`h-7 border border-gray-300 px-2 text-right font-mono truncate text-xs transition-colors cursor-cell ${
+                          className={`h-7 border border-[#2a2a34] px-2 text-right truncate text-xs transition-colors cursor-cell relative ${
                             isSelected
-                              ? 'bg-blue-50/60 ring-2 ring-blue-600 ring-inset z-10'
-                              : 'bg-white hover:bg-gray-50'
+                              ? 'bg-acca-red/10 ring-2 ring-acca-red ring-inset z-10 text-white'
+                              : 'text-gray-300 hover:bg-[#1f1f28]'
                           } ${
                             cell?.format === 'bold' || cell?.format === 'header'
-                              ? 'font-bold text-gray-900 bg-gray-50/50'
-                              : 'text-gray-800'
+                              ? 'font-bold text-white bg-[#1a1a22]'
+                              : ''
                           }`}
                         >
-                          {formattedDisplay}
+                          {isSelected && isInlineEditing ? (
+                            <input
+                              ref={inlineInputRef}
+                              type="text"
+                              value={inlineValue}
+                              onChange={e => setInlineValue(e.target.value)}
+                              onBlur={() => {
+                                setIsInlineEditing(false);
+                                updateCellValue(addr, inlineValue);
+                              }}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  setIsInlineEditing(false);
+                                  updateCellValue(addr, inlineValue);
+                                  // Move to row below
+                                  if (rIdx < activeSheet.rowCount - 1) {
+                                    setSelectedCell(`${colIndexToLetter(cIdx)}${rowNum + 1}`);
+                                  }
+                                } else if (e.key === 'Escape') {
+                                  setIsInlineEditing(false);
+                                  setInlineValue(cell?.raw || '');
+                                }
+                              }}
+                              className="absolute inset-0 w-full h-full bg-[#18181e] text-white px-2 text-right font-mono text-xs outline-none border border-acca-red"
+                            />
+                          ) : (
+                            formattedDisplay
+                          )}
                         </td>
                       );
                     })}
@@ -693,39 +789,52 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
         </div>
 
         {/* Bottom Worksheet Tabs Bar */}
-        <div className="bg-gray-100 border-t border-gray-200 px-3 py-2 flex items-center justify-between text-xs select-none">
-          <div className="flex items-center space-x-1 overflow-x-auto">
+        <div className="bg-[#18181e] border-t border-[#2a2a34] px-4 py-2 flex items-center justify-between text-xs select-none">
+          <div className="flex items-center space-x-1.5 overflow-x-auto">
             {workbook?.sheets.map((sheet, idx) => (
-              <button
-                key={sheet.id}
-                type="button"
-                onClick={() => {
-                  setActiveSheetIndex(idx);
-                  setSelectedCell('A1');
-                }}
-                className={`px-3 py-1 rounded-t-lg font-bold border-t border-x text-xs transition-all ${
-                  idx === activeSheetIndex
-                    ? 'bg-white border-gray-300 text-gray-900 shadow-xs'
-                    : 'bg-gray-200 border-transparent text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                {sheet.name}
-              </button>
+              <div key={sheet.id} className="flex items-center group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveSheetIndex(idx);
+                    setSelectedCell('A1');
+                  }}
+                  onDoubleClick={() => handleRenameSheet(idx)}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center space-x-1.5 ${
+                    idx === activeSheetIndex
+                      ? 'bg-acca-red text-white shadow-xs'
+                      : 'bg-[#141419] border border-[#2a2a34] text-gray-400 hover:text-white hover:bg-[#25252e]'
+                  }`}
+                >
+                  <span>{sheet.name}</span>
+                </button>
+
+                {workbook.sheets.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSheet(idx)}
+                    className="p-1 text-gray-500 hover:text-rose-400 rounded opacity-0 group-hover:opacity-100 transition-opacity ml-0.5"
+                    title={`Delete sheet ${sheet.name}`}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             ))}
 
             <button
               type="button"
               onClick={handleAddSheet}
-              className="p-1 rounded text-gray-500 hover:text-gray-900 hover:bg-gray-200 transition-colors ml-1"
+              className="p-1.5 rounded-xl bg-[#141419] border border-[#2a2a34] text-gray-400 hover:text-white hover:bg-[#25252e] transition-colors"
               title="Add Worksheet"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <span className="text-[11px] text-gray-500">
-            Selected Cell: <strong>{selectedCell}</strong>
-          </span>
+          <div className="text-[11px] text-gray-400">
+            Active: <strong className="text-white font-mono">{selectedCell}</strong>
+          </div>
         </div>
       </div>
     </div>

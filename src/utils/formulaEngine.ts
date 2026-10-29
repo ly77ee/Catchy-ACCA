@@ -191,16 +191,46 @@ function evaluateExpression(
   callStack: Set<string> = new Set(),
   allSheets?: SpreadsheetSheet[]
 ): any {
-  // Check for functions: FUNCTION_NAME(...)
-  const fnMatch = expr.match(/^([A-Za-z_][A-Za-z0-9_\.]*)\((.*)\)$/s);
+  const trimmed = expr.trim();
+
+  // If expression is a quoted string literal e.g. "Pass" or "Goodwill"
+  if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) {
+    return trimmed.slice(1, -1);
+  }
+
+  // Check for whole-expression function: FUNCTION_NAME(...)
+  const fnMatch = trimmed.match(/^([A-Za-z_][A-Za-z0-9_\.]*)\((.*)\)$/s);
   if (fnMatch) {
     const fnName = fnMatch[1].toUpperCase();
     const argsRaw = splitArguments(fnMatch[2]);
     return executeFunction(fnName, argsRaw, cells, currentCellId, callStack, allSheets);
   }
 
+  // If expression contains function calls as sub-expressions (e.g. SUM(B2:B10)*10%)
+  // Evaluate and replace innermost function calls first
+  let resolvedExpr = trimmed;
+  let safetyLoop = 0;
+  const funcRegex = /\b([A-Za-z_][A-Za-z0-9_\.]*)\(([^()]*)\)/;
+
+  while (funcRegex.test(resolvedExpr) && safetyLoop < 10) {
+    safetyLoop++;
+    resolvedExpr = resolvedExpr.replace(funcRegex, (match, fnName, argsStr) => {
+      const upperFn = fnName.toUpperCase();
+      const args = splitArguments(argsStr);
+      try {
+        const val = executeFunction(upperFn, args, cells, currentCellId, callStack, allSheets);
+        if (typeof val === 'string' && val.startsWith('#')) {
+          throw new Error(val);
+        }
+        return typeof val === 'number' ? String(val) : JSON.stringify(val ?? 0);
+      } catch (err: any) {
+        throw new Error(err.message || '#ERROR!');
+      }
+    });
+  }
+
   // Handle arithmetic and logic expression using a clean recursive descent tokenizer
-  return parseArithmetic(expr, cells, currentCellId, callStack, allSheets);
+  return parseArithmetic(resolvedExpr, cells, currentCellId, callStack, allSheets);
 }
 
 /**
@@ -523,15 +553,27 @@ function parseArithmetic(
 }
 
 /**
- * Safe deterministic parser for arithmetic (+, -, *, /, ^, parentheses, comparisons).
+ * Safe deterministic parser for arithmetic (+, -, *, /, ^, parentheses, comparisons, %).
  */
 function safeMathEval(expr: string): any {
   const clean = expr.trim();
+
+  // If clean is a quoted string literal
+  if (clean.startsWith('"') && clean.endsWith('"') && clean.length >= 2) {
+    return clean.slice(1, -1);
+  }
+
+  // Pure integer or decimal number
   if (/^[0-9]+(?:\.[0-9]+)?$/.test(clean)) {
     return Number(clean);
   }
 
-  // Handle comparison operators (>, <, >=, <=, =, <>)
+  // Pure percentage e.g. 10%
+  if (/^[0-9]+(?:\.[0-9]+)?%$/.test(clean)) {
+    return parseFloat(clean.slice(0, -1)) / 100;
+  }
+
+  // Handle comparison operators (>=, <=, <>, >, <, =)
   const compMatch = clean.match(/^(.*?)(>=|<=|<>|>|<|=)(.*)$/);
   if (compMatch) {
     const left = safeMathEval(compMatch[1]);
@@ -548,11 +590,17 @@ function safeMathEval(expr: string): any {
   // Tokenize arithmetic
   const tokens = tokenizeMath(clean);
   if (!tokens || tokens.length === 0) return 0;
+
+  // If there is only one token and it's a string literal, return it
+  if (tokens.length === 1 && tokens[0].startsWith('"') && tokens[0].endsWith('"')) {
+    return tokens[0].slice(1, -1);
+  }
+
   return evaluateTokens(tokens);
 }
 
 function tokenizeMath(expr: string): string[] | null {
-  const regex = /\s*([0-9]+(?:\.[0-9]+)?|[A-Za-z_]+|[+\-*/^()]|"[^"]*")\s*/g;
+  const regex = /\s*([0-9]+(?:\.[0-9]+)?%?|[A-Za-z_]+|[+\-*/^()]|"[^"]*")\s*/g;
   const tokens: string[] = [];
   let match: RegExpExecArray | null;
   let lastIndex = 0;
@@ -565,25 +613,33 @@ function tokenizeMath(expr: string): string[] | null {
   return lastIndex === expr.length ? tokens : null;
 }
 
-function evaluateTokens(tokens: string[]): number {
+function evaluateTokens(tokens: string[]): any {
   let pos = 0;
 
-  function parseExpression(): number {
+  function parseExpression(): any {
     let result = parseTerm();
     while (pos < tokens.length && (tokens[pos] === '+' || tokens[pos] === '-')) {
       const op = tokens[pos++];
       const nextTerm = parseTerm();
-      if (op === '+') result += nextTerm;
-      else result -= nextTerm;
+      if (typeof result === 'string' || typeof nextTerm === 'string') {
+        if (op === '+') result = String(result) + String(nextTerm);
+        else throw new Error('#VALUE!');
+      } else {
+        if (op === '+') result += nextTerm;
+        else result -= nextTerm;
+      }
     }
     return result;
   }
 
-  function parseTerm(): number {
+  function parseTerm(): any {
     let result = parseFactor();
     while (pos < tokens.length && (tokens[pos] === '*' || tokens[pos] === '/' || tokens[pos] === '^')) {
       const op = tokens[pos++];
       const nextFactor = parseFactor();
+      if (typeof result !== 'number' || typeof nextFactor !== 'number') {
+        throw new Error('#VALUE!');
+      }
       if (op === '*') result *= nextFactor;
       else if (op === '/') {
         if (nextFactor === 0) throw new Error('#DIV/0!');
@@ -595,7 +651,7 @@ function evaluateTokens(tokens: string[]): number {
     return result;
   }
 
-  function parseFactor(): number {
+  function parseFactor(): any {
     if (pos >= tokens.length) return 0;
     const token = tokens[pos++];
 
@@ -611,6 +667,15 @@ function evaluateTokens(tokens: string[]): number {
         pos++;
       }
       return result;
+    }
+
+    if (token.startsWith('"') && token.endsWith('"')) {
+      return token.slice(1, -1);
+    }
+
+    if (token.endsWith('%')) {
+      const val = parseFloat(token.slice(0, -1));
+      if (!isNaN(val)) return val / 100;
     }
 
     const num = Number(token);

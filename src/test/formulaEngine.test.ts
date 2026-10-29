@@ -11,6 +11,44 @@ import {
 import { CellData, SpreadsheetSheet, SpreadsheetWorkbook } from '../types';
 
 describe('Spreadsheet Formula Engine & Financial Calculations', () => {
+  it('evaluates Section 6 required formula suite: SUM, A1+B1, IF string return, and % multiplier', () => {
+    const cells: Record<string, CellData> = {
+      A1: { raw: '150' },
+      B1: { raw: '50' },
+      A2: { raw: '10' },
+      A3: { raw: '20' },
+      A4: { raw: '30' },
+      A5: { raw: '40' },
+      B2: { raw: '100' },
+      B3: { raw: '200' },
+      B4: { raw: '300' },
+      B5: { raw: '400' },
+      B6: { raw: '0' },
+      B7: { raw: '0' },
+      B8: { raw: '0' },
+      B9: { raw: '0' },
+      B10: { raw: '0' }
+    };
+
+    // 1. =SUM(A1:A5)
+    expect(evaluateFormula('=SUM(A1:A5)', cells)).toBe(250);
+
+    // 2. =A1+B1
+    expect(evaluateFormula('=A1+B1', cells)).toBe(200);
+
+    // 3. =IF(A1>100,"Pass","Fail")
+    expect(evaluateFormula('=IF(A1>100,"Pass","Fail")', cells)).toBe('Pass');
+
+    const failCells: Record<string, CellData> = {
+      A1: { raw: '80' }
+    };
+    expect(evaluateFormula('=IF(A1>100,"Pass","Fail")', failCells)).toBe('Fail');
+
+    // 4. =SUM(B2:B10)*10%
+    // Sum of B2..B10 = 1000. 1000 * 10% = 100.
+    expect(evaluateFormula('=SUM(B2:B10)*10%', cells)).toBe(100);
+  });
+
   it('evaluates basic arithmetic and operator precedence', () => {
     const cells: Record<string, CellData> = {};
 

@@ -4,6 +4,16 @@ export type PaperStatus = 'not_started' | 'in_progress' | 'passed' | 'exempt';
 
 export type QuestionStatus = 'not_started' | 'attempted' | 'completed' | 'needs_review';
 
+export type QuestionPublishStatus = 'draft' | 'published' | 'archived';
+
+export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
+
+export interface QuestionExhibit {
+  id: string;
+  title: string;
+  content: string;
+}
+
 export type QuestionType =
   | 'section_a_mcq'
   | 'section_b_case'
@@ -116,11 +126,22 @@ export interface QuestionRecord {
   questionNumber: string;
   title: string;
   paperId: string;
+  qualificationVersionId?: string;
+  syllabusArea?: string;
+  topic?: string;
   sourceMaterialId?: string; // Link to StudyMaterial.id
   sourcePage?: number;
   sourcePageEnd?: number;
   topicTags: string[];
   questionType: QuestionType;
+  difficulty?: QuestionDifficulty;
+  suggestedMinutes?: number;
+  scenario?: string; // Long scenario or background
+  content?: string; // Detailed question text
+  exhibits?: QuestionExhibit[];
+  modelAnswer?: string; // Separated author model answer
+  rubric?: string; // Marking rubric
+  publishStatus?: QuestionPublishStatus;
   notes: string;
   status: QuestionStatus;
   isDoubt: boolean;
@@ -306,6 +327,48 @@ export interface RevisionTopicStat {
   status: 'mastered' | 'solid' | 'needs_revision';
 }
 
+// Markdown Study Checklist Types
+export interface ChecklistItem {
+  id: string;
+  checklistId: string;
+  paperId: string;
+  syllabusArea?: string;
+  topic?: string;
+  title: string;
+  completed: boolean;
+  order: number;
+  level: number; // 0 = heading 1 / paper, 1 = heading 2 / syllabus area, 2 = heading 3 / topic, 3 = item
+  isHeader?: boolean;
+  rawMarkdown?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChecklistRecord {
+  id: string;
+  title: string;
+  paperId: string;
+  qualificationVersionId?: string;
+  rawMarkdown: string;
+  totalTasks: number;
+  completedTasks: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ACCA News Types
+export interface AccaNewsItem {
+  id: string;
+  title: string;
+  source: string;
+  url: string;
+  publishedAt: string;
+  summary: string;
+  category: 'qualification' | 'exam' | 'syllabus' | 'general';
+  isOfficial: boolean;
+  fetchedAt?: string;
+}
+
 export interface BackupPayload {
   version: string;
   exportedAt: string;
@@ -320,6 +383,9 @@ export interface BackupPayload {
   examAttempts?: ExamAttemptRecord[];
   writtenAnswers?: WrittenAnswerDraft[];
   spreadsheets?: SpreadsheetWorkbook[];
+  checklists?: ChecklistRecord[];
+  checklistItems?: ChecklistItem[];
+  newsCache?: AccaNewsItem[];
   aiConfig?: AIProviderConfig;
   answerReviews?: AnswerReviewResult[];
 }

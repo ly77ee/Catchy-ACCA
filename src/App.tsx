@@ -14,6 +14,7 @@ import { StudentPaperRecord } from './types';
 import { AppLayout } from './components/layout/AppLayout';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { MyAcca } from './components/qualification/MyAcca';
+import { StudyChecklist } from './components/checklist/StudyChecklist';
 import { StudyMaterials } from './components/study-materials/StudyMaterials';
 import { Questions } from './components/questions/Questions';
 import { ExamEnvironment } from './components/exam/ExamEnvironment';
@@ -25,6 +26,7 @@ import { AIAssistant } from './components/ai/AIAssistant';
 import { RevisionAnalytics } from './components/revision/RevisionAnalytics';
 import { ExamPlanner } from './components/planner/ExamPlanner';
 import { TopicGrouping } from './components/topics/TopicGrouping';
+import { AccaNews } from './components/news/AccaNews';
 
 // Icons for Future Modules
 import { FileCheck, Table2, PenTool, TrendingUp, Bot } from 'lucide-react';
@@ -112,6 +114,8 @@ export const App: React.FC = () => {
           target={currentTarget}
           studyPlans={studyPlans || []}
           activityLogs={activityLogs || []}
+          questions={questions || []}
+          examAttempts={examAttempts || []}
           onNavigate={setActiveTab}
           onSelectPaper={handleSelectPaper}
         />
@@ -123,6 +127,14 @@ export const App: React.FC = () => {
           currentVersionId={versionId}
           onVersionChange={setVersionId}
           paperRecords={paperRecordsMap}
+        />
+      )}
+
+      {/* Tab: Study Checklist (Markdown / Obsidian inspired) */}
+      {(activeTab === 'checklist' || activeTab === 'study-checklist') && (
+        <StudyChecklist
+          version={activeVersion}
+          onNavigateToPaper={handleSelectPaper}
         />
       )}
 
@@ -241,6 +253,11 @@ export const App: React.FC = () => {
             setActiveTab('exam-environment');
           }}
         />
+      )}
+
+      {/* Tab: ACCA News */}
+      {activeTab === 'acca-news' && (
+        <AccaNews />
       )}
 
       {/* Tab: AI Assistant */}
