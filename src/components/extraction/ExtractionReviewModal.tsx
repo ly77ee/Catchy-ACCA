@@ -210,15 +210,15 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
       <div className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity" onClick={onClose} />
 
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="w-full max-w-6xl transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all border border-gray-200 flex flex-col h-[88vh]">
+        <div className="w-full max-w-6xl transform overflow-hidden rounded-2xl bg-[#1e1e24] shadow-2xl transition-all border border-[#2a2a34] flex flex-col h-[88vh]">
           {/* Header */}
-          <div className="bg-neutral-900 px-6 py-4 border-b border-neutral-800 flex items-center justify-between text-white shrink-0">
+          <div className="bg-[#141419] px-6 py-4 border-b border-[#2a2a34] flex items-center justify-between text-white shrink-0">
             <div>
               <div className="flex items-center space-x-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-acca-red bg-neutral-800 px-2.5 py-0.5 rounded-full border border-neutral-700">
+                <span className="text-xs font-bold uppercase tracking-wider text-acca-red bg-red-950/40 px-2.5 py-0.5 rounded-full border border-red-800/40">
                   Question Review & Verification
                 </span>
-                <span className="text-xs text-neutral-400">Source: {materialTitle}</span>
+                <span className="text-xs text-gray-400">Source: {materialTitle}</span>
               </div>
               <h2 className="text-lg font-bold text-white mt-1">
                 Review Extracted Questions & Answer Keys
@@ -226,12 +226,12 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
             </div>
 
             <div className="flex items-center space-x-4">
-              <span className="text-xs font-medium text-neutral-300">
+              <span className="text-xs font-medium text-gray-300">
                 <strong className="text-white font-bold">{approvedCount}</strong> of {drafts.length} Selected for Import
               </span>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#25252e] transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -241,8 +241,8 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
           {/* Main 2-Column Body */}
           <div className="flex-1 flex overflow-hidden">
             {/* Left: Questions List / Index */}
-            <div className="w-72 bg-gray-50 border-r border-gray-200 overflow-y-auto p-3 space-y-2 shrink-0">
-              <div className="flex items-center justify-between pb-2 px-1 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <div className="w-72 bg-[#141419] border-r border-[#2a2a34] overflow-y-auto p-3 space-y-2 shrink-0">
+              <div className="flex items-center justify-between pb-2 px-1 text-xs font-bold text-gray-400 uppercase tracking-wider">
                 <span>Extracted Items</span>
                 <div className="flex space-x-2">
                   <button
@@ -255,7 +255,7 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setDrafts(prev => prev.map(d => ({ ...d, isApproved: false })))}
-                    className="text-[10px] text-gray-500 hover:underline"
+                    className="text-[10px] text-gray-400 hover:underline"
                   >
                     Deselect
                   </button>
@@ -270,8 +270,8 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                     onClick={() => setSelectedIndex(idx)}
                     className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-start space-x-2.5 ${
                       isSelected
-                        ? 'bg-white border-acca-red shadow-xs ring-1 ring-acca-red'
-                        : 'bg-white border-gray-200 hover:border-gray-300'
+                        ? 'bg-[#25252e] border-acca-red shadow-xs ring-1 ring-acca-red'
+                        : 'bg-[#181820] border-[#2a2a34] hover:border-[#3a3a46]'
                     }`}
                   >
                     <input
@@ -281,25 +281,25 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                         e.stopPropagation();
                         toggleApproval(idx);
                       }}
-                      className="mt-0.5 rounded text-acca-red focus:ring-acca-red border-gray-300"
+                      className="mt-0.5 rounded text-acca-red focus:ring-acca-red border-[#374151] bg-[#141419]"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-black text-gray-900">{draft.questionNumber}</span>
+                        <span className="font-black text-white">{draft.questionNumber}</span>
                         <span className="text-[10px] font-bold text-gray-400">p.{draft.sourcePageStart}</span>
                       </div>
-                      <p className="text-gray-600 truncate mt-0.5">{draft.title}</p>
+                      <p className="text-gray-300 truncate mt-0.5">{draft.title}</p>
                       <div className="flex items-center space-x-1.5 mt-1.5 text-[10px]">
-                        <span className="bg-gray-100 text-gray-700 px-1.5 py-0.2 rounded font-semibold">
+                        <span className="bg-[#141419] text-gray-300 border border-[#2a2a34] px-1.5 py-0.2 rounded font-semibold">
                           {draft.availableMarks}m
                         </span>
                         {draft.options.length > 0 && (
-                          <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-semibold">
+                          <span className="bg-emerald-950/40 text-emerald-300 border border-emerald-800/50 px-1.5 py-0.2 rounded font-semibold">
                             {draft.options.length} opts
                           </span>
                         )}
                         {draft.warningMessages.length > 0 && (
-                          <span className="text-amber-600 flex items-center" title={draft.warningMessages[0]}>
+                          <span className="text-amber-400 flex items-center" title={draft.warningMessages[0]}>
                             <AlertTriangle className="w-3 h-3" />
                           </span>
                         )}
@@ -311,16 +311,16 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
             </div>
 
             {/* Right: Focused Question Editor */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#1e1e24] text-gray-100">
               {currentDraft && (
                 <>
                   {/* Warning Banners if any */}
                   {currentDraft.warningMessages.map((w, idx) => (
                     <div
                       key={idx}
-                      className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start space-x-2"
+                      className="p-3 bg-amber-950/20 border border-amber-900/40 rounded-xl text-xs text-amber-300 flex items-start space-x-2"
                     >
-                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                       <span>{w}</span>
                     </div>
                   ))}
@@ -328,29 +328,29 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                   {/* Header Meta Form */}
                   <div className="grid grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                      <label className="block text-xs font-bold text-gray-300 uppercase mb-1">
                         Question No.
                       </label>
                       <input
                         type="text"
                         value={currentDraft.questionNumber}
                         onChange={(e) => updateCurrentDraft('questionNumber', e.target.value)}
-                        className="w-full text-xs border border-gray-300 rounded-lg p-2 font-bold outline-none focus:border-acca-red"
+                        className="w-full text-xs bg-[#141419] text-gray-100 border border-[#374151] rounded-lg p-2 font-bold outline-none focus:border-acca-red"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                      <label className="block text-xs font-bold text-gray-300 uppercase mb-1">
                         Paper
                       </label>
                       <input
                         type="text"
                         value={currentDraft.paperId}
                         onChange={(e) => updateCurrentDraft('paperId', e.target.value)}
-                        className="w-full text-xs border border-gray-300 rounded-lg p-2 font-bold outline-none focus:border-acca-red"
+                        className="w-full text-xs bg-[#141419] text-gray-100 border border-[#374151] rounded-lg p-2 font-bold outline-none focus:border-acca-red"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                      <label className="block text-xs font-bold text-gray-300 uppercase mb-1">
                         Marks
                       </label>
                       <input
@@ -359,11 +359,11 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                         max="50"
                         value={currentDraft.availableMarks}
                         onChange={(e) => updateCurrentDraft('availableMarks', Number(e.target.value))}
-                        className="w-full text-xs border border-gray-300 rounded-lg p-2 font-bold outline-none focus:border-acca-red"
+                        className="w-full text-xs bg-[#141419] text-gray-100 border border-[#374151] rounded-lg p-2 font-bold outline-none focus:border-acca-red"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                      <label className="block text-xs font-bold text-gray-300 uppercase mb-1">
                         Source Page
                       </label>
                       <input
@@ -371,7 +371,7 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                         min="1"
                         value={currentDraft.sourcePageStart}
                         onChange={(e) => updateCurrentDraft('sourcePageStart', Number(e.target.value))}
-                        className="w-full text-xs border border-gray-300 rounded-lg p-2 font-bold outline-none focus:border-acca-red"
+                        className="w-full text-xs bg-[#141419] text-gray-100 border border-[#374151] rounded-lg p-2 font-bold outline-none focus:border-acca-red"
                       />
                     </div>
                   </div>
@@ -379,24 +379,24 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                   {/* Title & Question Type */}
                   <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-2">
-                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                      <label className="block text-xs font-bold text-gray-300 uppercase mb-1">
                         Question Title / Summary
                       </label>
                       <input
                         type="text"
                         value={currentDraft.title}
                         onChange={(e) => updateCurrentDraft('title', e.target.value)}
-                        className="w-full text-xs border border-gray-300 rounded-lg p-2 font-medium outline-none focus:border-acca-red"
+                        className="w-full text-xs bg-[#141419] text-gray-100 border border-[#374151] rounded-lg p-2 font-medium outline-none focus:border-acca-red"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                      <label className="block text-xs font-bold text-gray-300 uppercase mb-1">
                         Question Type
                       </label>
                       <select
                         value={currentDraft.questionType}
                         onChange={(e) => updateCurrentDraft('questionType', e.target.value as QuestionType)}
-                        className="w-full text-xs border border-gray-300 rounded-lg p-2 font-medium outline-none focus:border-acca-red bg-white"
+                        className="w-full text-xs border border-[#374151] rounded-lg p-2 font-medium outline-none focus:border-acca-red bg-[#141419] text-gray-100"
                       >
                         <option value="section_a_mcq">Section A (Single-Select MCQ)</option>
                         <option value="multi_select">Section A/B (Multi-Select)</option>
@@ -409,25 +409,25 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
 
                   {/* Full Prompt Textarea */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                    <label className="block text-xs font-bold text-gray-300 uppercase mb-1">
                       Question Requirement / Scenario Text
                     </label>
                     <textarea
                       rows={4}
                       value={currentDraft.prompt}
                       onChange={(e) => updateCurrentDraft('prompt', e.target.value)}
-                      className="w-full text-xs border border-gray-300 rounded-lg p-2.5 font-mono leading-relaxed outline-none focus:border-acca-red"
+                      className="w-full text-xs bg-[#141419] text-gray-100 border border-[#374151] rounded-lg p-2.5 font-mono leading-relaxed outline-none focus:border-acca-red"
                     />
                   </div>
 
                   {/* Objective Options & Answer Key */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+                  <div className="bg-[#141419] border border-[#2a2a34] rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <span className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                        <span className="text-xs font-bold uppercase tracking-wider text-gray-300">
                           Options & Correct Answer Key
                         </span>
-                        <span className="text-[11px] text-gray-500">
+                        <span className="text-[11px] text-gray-400">
                           (Click the letter pill to mark as the correct answer)
                         </span>
                       </div>
@@ -458,7 +458,7 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                                 className={`w-8 h-8 rounded-lg font-bold text-xs flex items-center justify-center transition-colors shrink-0 ${
                                   isCorrect
                                     ? 'bg-emerald-600 text-white shadow-xs'
-                                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                                    : 'bg-[#181820] border border-[#374151] text-gray-300 hover:border-gray-400'
                                 }`}
                                 title={isCorrect ? 'Marked as correct option' : 'Click to set as correct option'}
                               >
@@ -470,13 +470,13 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                                 value={opt.text}
                                 onChange={(e) => handleOptionTextChange(optIdx, e.target.value)}
                                 placeholder={`Option ${opt.label} text...`}
-                                className="flex-1 text-xs bg-white border border-gray-300 rounded-lg p-2 outline-none focus:border-acca-red"
+                                className="flex-1 text-xs bg-[#141419] text-gray-100 border border-[#374151] rounded-lg p-2 outline-none focus:border-acca-red"
                               />
 
                               <button
                                 type="button"
                                 onClick={() => handleRemoveOption(optIdx)}
-                                className="p-1.5 text-gray-400 hover:text-red-500 rounded"
+                                className="p-1.5 text-gray-400 hover:text-red-400 rounded"
                                 title="Remove option"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -490,19 +490,19 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
 
                   {/* SubQuestions & Mark Breakdown */}
                   {currentDraft.subQuestions && currentDraft.subQuestions.length > 0 && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
-                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-700">
+                    <div className="bg-[#141419] border border-[#2a2a34] rounded-xl p-4 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-300">
                         <span>Subquestions & Mark Breakdown ({currentDraft.subQuestions.length})</span>
-                        <span className="text-[11px] text-gray-500 font-normal">Identified structured requirements</span>
+                        <span className="text-[11px] text-gray-400 font-normal">Identified structured requirements</span>
                       </div>
                       <div className="space-y-2">
                         {currentDraft.subQuestions.map((sq, sqIdx) => (
-                          <div key={sq.id || sqIdx} className="bg-white border border-gray-200 rounded-lg p-3 text-xs space-y-1">
-                            <div className="flex items-center justify-between font-bold text-gray-800">
+                          <div key={sq.id || sqIdx} className="bg-[#181820] border border-[#2a2a34] rounded-lg p-3 text-xs space-y-1">
+                            <div className="flex items-center justify-between font-bold text-gray-200">
                               <span>Part {sq.label}</span>
                               {sq.marks && <span className="text-acca-red font-mono">{sq.marks} Marks</span>}
                             </div>
-                            <p className="text-gray-600 font-mono text-[11px] leading-relaxed">{sq.prompt}</p>
+                            <p className="text-gray-400 font-mono text-[11px] leading-relaxed">{sq.prompt}</p>
                           </div>
                         ))}
                       </div>
@@ -510,8 +510,8 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                   )}
 
                   {/* Topic Intelligence Suggestions */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
-                    <div className="flex items-center space-x-2 text-xs font-bold text-gray-700 uppercase">
+                  <div className="bg-[#141419] border border-[#2a2a34] rounded-xl p-4 space-y-2">
+                    <div className="flex items-center space-x-2 text-xs font-bold text-gray-300 uppercase">
                       <Sparkles className="w-4 h-4 text-acca-red" />
                       <span>Topic Intelligence Tags</span>
                     </div>
@@ -520,13 +520,13 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                       {currentDraft.topicSuggestions.map((tag) => (
                         <span
                           key={tag}
-                          className="inline-flex items-center text-xs font-semibold bg-white border border-gray-300 text-gray-800 px-2.5 py-1 rounded-lg"
+                          className="inline-flex items-center text-xs font-semibold bg-[#181820] border border-[#2a2a34] text-gray-200 px-2.5 py-1 rounded-lg"
                         >
                           <span>#{tag}</span>
                           <button
                             type="button"
                             onClick={() => handleRejectTopic(tag)}
-                            className="ml-1.5 text-gray-400 hover:text-red-500"
+                            className="ml-1.5 text-gray-400 hover:text-red-400"
                             title="Remove tag"
                           >
                             <X className="w-3 h-3" />
@@ -548,14 +548,14 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                             }
                           }
                         }}
-                        className="text-xs bg-white border border-dashed border-gray-300 rounded-lg px-2.5 py-1 outline-none focus:border-acca-red"
+                        className="text-xs bg-[#181820] border border-dashed border-[#374151] rounded-lg px-2.5 py-1 text-gray-100 outline-none focus:border-acca-red"
                       />
                     </div>
                   </div>
 
                   {/* Solution / Marking Guide */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                    <label className="block text-xs font-bold text-gray-300 uppercase mb-1">
                       Marking Guide / Solution Explanation (Where Available)
                     </label>
                     <textarea
@@ -563,7 +563,7 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                       value={currentDraft.markingGuide || ''}
                       onChange={(e) => updateCurrentDraft('markingGuide', e.target.value)}
                       placeholder="Explanation, marking breakdown, or standard references..."
-                      className="w-full text-xs border border-gray-300 rounded-lg p-2.5 outline-none focus:border-acca-red"
+                      className="w-full text-xs bg-[#141419] text-gray-100 border border-[#374151] rounded-lg p-2.5 outline-none focus:border-acca-red"
                     />
                   </div>
                 </>
@@ -572,8 +572,8 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
           </div>
 
           {/* Footer Actions */}
-          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between shrink-0">
-            <span className="text-xs text-gray-500">
+          <div className="bg-[#141419] px-6 py-4 border-t border-[#2a2a34] flex items-center justify-between shrink-0">
+            <span className="text-xs text-gray-400">
               Preserves page references and validates answer keys before adding to question bank.
             </span>
 
@@ -581,7 +581,7 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-[#25252e] hover:text-white rounded-xl transition-colors"
               >
                 Discard & Close
               </button>

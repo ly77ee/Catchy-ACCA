@@ -26,9 +26,9 @@ export const ConnectedWorkspace: React.FC<ConnectedWorkspaceProps> = ({
   return (
     <div className="space-y-4 max-w-7xl mx-auto pb-12">
       {/* Workspace View Switcher Bar */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-xs flex items-center justify-between">
+      <div className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] p-3 shadow-xs flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-gray-500 mr-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-400 mr-2">
             Workspace Mode:
           </span>
 
@@ -37,8 +37,8 @@ export const ConnectedWorkspace: React.FC<ConnectedWorkspaceProps> = ({
             onClick={() => setViewMode('split')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
               viewMode === 'split'
-                ? 'bg-neutral-900 text-white shadow-xs'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-acca-red text-white shadow-xs'
+                : 'text-gray-300 hover:bg-[#25252e] hover:text-white'
             }`}
           >
             <Columns className="w-3.5 h-3.5" />
@@ -51,7 +51,7 @@ export const ConnectedWorkspace: React.FC<ConnectedWorkspaceProps> = ({
             className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
               viewMode === 'writer'
                 ? 'bg-acca-red text-white shadow-xs'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-gray-300 hover:bg-[#25252e] hover:text-white'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
@@ -63,8 +63,8 @@ export const ConnectedWorkspace: React.FC<ConnectedWorkspaceProps> = ({
             onClick={() => setViewMode('spreadsheet')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
               viewMode === 'spreadsheet'
-                ? 'bg-emerald-700 text-white shadow-xs'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-gray-300 hover:bg-[#25252e] hover:text-white'
             }`}
           >
             <Table2 className="w-3.5 h-3.5" />

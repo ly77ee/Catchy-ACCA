@@ -22,7 +22,6 @@ import { StudyMaterial, QualificationVersion } from '../../types';
 import { db, logActivity } from '../../db';
 import { PdfViewer } from './PdfViewer';
 import {
-  MAX_STUDY_MATERIALS,
   MAX_PDF_FILE_SIZE_BYTES,
   MATERIAL_TYPE_OPTIONS,
   MaterialTypeOption,
@@ -72,7 +71,7 @@ export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadPaperId, setUploadPaperId] = useState('FR');
   const [uploadMaterialType, setUploadMaterialType] = useState<MaterialTypeOption>('Exam Kit');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -92,29 +91,42 @@ export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const replaceFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Validate and handle file input
-  const processIncomingFile = (file: File): boolean => {
-    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      setUploadError('Only valid PDF study documents are supported.');
-      return false;
+  // Validate and handle incoming file(s)
+  const processIncomingFiles = (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
+    const validFiles: File[] = [];
+    const errorMessages: string[] = [];
+
+    for (const file of files) {
+      if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+        errorMessages.push(`"${file.name}" is not a PDF.`);
+        continue;
+      }
+      if (file.size > MAX_PDF_FILE_SIZE_BYTES) {
+        errorMessages.push(`"${file.name}" exceeds ${formatFileSize(MAX_PDF_FILE_SIZE_BYTES)}.`);
+        continue;
+      }
+      validFiles.push(file);
     }
-    if (file.size > MAX_PDF_FILE_SIZE_BYTES) {
-      setUploadError(`File exceeds the maximum limit of ${formatFileSize(MAX_PDF_FILE_SIZE_BYTES)}.`);
-      return false;
+
+    if (errorMessages.length > 0) {
+      setUploadError(errorMessages.join(' '));
+    } else {
+      setUploadError(null);
     }
-    setSelectedFile(file);
-    setUploadError(null);
-    if (!uploadTitle.trim()) {
-      const defaultName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-      setUploadTitle(defaultName);
+
+    if (validFiles.length > 0) {
+      setSelectedFiles(validFiles);
+      if (validFiles.length === 1 && !uploadTitle.trim()) {
+        const defaultName = validFiles[0].name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        setUploadTitle(defaultName);
+      }
     }
-    return true;
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      processIncomingFile(file);
+    if (e.target.files && e.target.files.length > 0) {
+      processIncomingFiles(e.target.files);
     }
   };
 
@@ -131,67 +143,81 @@ export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      processIncomingFile(file);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processIncomingFiles(e.dataTransfer.files);
     }
   };
 
-  // Save new upload
+  // Save new upload(s) - unlimited storage support
   const handleSaveUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (materials.length >= MAX_STUDY_MATERIALS) {
-      setUploadError(`Limit reached: maximum of ${MAX_STUDY_MATERIALS} active study documents allowed.`);
-      return;
-    }
-
-    if (!selectedFile) {
-      setUploadError('Please select a PDF file to import.');
+    if (selectedFiles.length === 0) {
+      setUploadError('Please select at least one PDF file to import.');
       return;
     }
 
     setIsProcessingFile(true);
     setUploadError(null);
+    const errors: string[] = [];
+    let importedCount = 0;
 
     try {
-      const arrayBuffer = await selectedFile.arrayBuffer();
-
-      // Configure worker for reading total pages
       if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
       }
 
-      // Verify that the PDF is readable and extract numPages
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer.slice(0) });
-      const pdfDoc = await loadingTask.promise;
-      const totalPages = pdfDoc.numPages || 1;
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer.slice(0) });
+          const pdfDoc = await loadingTask.promise;
+          const totalPages = pdfDoc.numPages || 1;
 
-      const newMaterial: StudyMaterial = {
-        id: 'mat-' + Date.now(),
-        title: uploadTitle.trim() || selectedFile.name,
-        fileName: selectedFile.name,
-        fileSize: selectedFile.size,
-        totalPages,
-        paperId: uploadPaperId,
-        materialType: uploadMaterialType,
-        tags: [uploadPaperId, uploadMaterialType, 'PDF Reference'],
-        addedAt: new Date().toISOString(),
-        pdfData: arrayBuffer,
-      };
+          const title = selectedFiles.length === 1 && uploadTitle.trim()
+            ? uploadTitle.trim()
+            : file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
 
-      await db.studyMaterials.put(newMaterial);
-      await logActivity(
-        'Study PDF Imported',
-        `Imported "${newMaterial.title}" (${totalPages} pages) for ${newMaterial.paperId}.`,
-        'document'
-      );
+          const newMaterial: StudyMaterial = {
+            id: 'mat-' + Date.now() + '-' + i,
+            title: title || file.name,
+            fileName: file.name,
+            fileSize: file.size,
+            totalPages,
+            paperId: uploadPaperId,
+            materialType: uploadMaterialType,
+            tags: [uploadPaperId, uploadMaterialType, 'PDF Reference'],
+            addedAt: new Date().toISOString(),
+            pdfData: arrayBuffer,
+          };
 
-      setIsUploading(false);
-      setSelectedFile(null);
-      setUploadTitle('');
+          await db.studyMaterials.put(newMaterial);
+          await logActivity(
+            'Study PDF Imported',
+            `Imported "${newMaterial.title}" (${totalPages} pages) for ${newMaterial.paperId}.`,
+            'document'
+          );
+          importedCount++;
+        } catch (fileErr: any) {
+          console.error(`PDF parsing error for ${file.name}:`, fileErr);
+          errors.push(`${file.name}: ${fileErr.message || 'Corrupted or invalid PDF'}`);
+        }
+      }
+
+      if (errors.length > 0) {
+        setUploadError(`Imported ${importedCount} of ${selectedFiles.length} file(s). Failed: ${errors.join(', ')}`);
+        if (importedCount > 0) {
+          setSelectedFiles([]);
+          setUploadTitle('');
+        }
+      } else {
+        setIsUploading(false);
+        setSelectedFiles([]);
+        setUploadTitle('');
+      }
     } catch (err: any) {
-      console.error('PDF parsing error:', err);
-      setUploadError(`Failed to read PDF document: ${err.message || 'The file appears corrupted or invalid.'}`);
+      console.error('Batch upload error:', err);
+      setUploadError(`Failed to process documents: ${err.message || 'Unknown error'}`);
     } finally {
       setIsProcessingFile(false);
     }
@@ -293,8 +319,6 @@ export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
     return matchesSearch && matchesPaper;
   });
 
-  const isLimitReached = materials.length >= MAX_STUDY_MATERIALS;
-
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* If an active viewer is open, display it */}
@@ -353,7 +377,7 @@ export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-acca-red bg-acca-red/10 border border-acca-red/20 px-2.5 py-0.5 rounded-full">
-                  {materials.length} of {MAX_STUDY_MATERIALS} materials used
+                  {materials.length} {materials.length === 1 ? 'material' : 'materials'} stored
                 </span>
                 <span className="text-xs text-gray-400">100% Private Local-First Storage</span>
               </div>
@@ -361,7 +385,7 @@ export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
                 Study Materials & Exam Kits Library
               </h1>
               <p className="text-xs text-gray-400 mt-0.5">
-                Upload up to 4 original PDFs once. Reference the exact same documents side-by-side in full-screen Excel and Word workspaces.
+                Add as many supported study materials as your device can store. Available storage and supported file formats apply.
               </p>
             </div>
 
@@ -369,33 +393,17 @@ export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
               <button
                 onClick={() => {
                   setUploadError(null);
+                  setSelectedFiles([]);
                   setIsUploading(true);
                 }}
-                disabled={isLimitReached}
-                className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center space-x-2 shadow-xs transition-all ${
-                  isLimitReached
-                    ? 'bg-neutral-800 text-gray-500 cursor-not-allowed border border-[#2a2a34]'
-                    : 'bg-acca-red hover:bg-acca-red-hover text-white'
-                }`}
-                title={isLimitReached ? `Limit of ${MAX_STUDY_MATERIALS} materials reached` : 'Import PDF'}
+                className="px-4 py-2.5 rounded-xl font-bold text-xs flex items-center space-x-2 shadow-xs transition-all bg-acca-red hover:bg-acca-red-hover text-white"
+                title="Import PDF Material"
               >
                 <Upload className="w-4 h-4" />
                 <span>Import PDF Material</span>
               </button>
             </div>
           </div>
-
-          {/* Limit Notice if Max is Reached */}
-          {isLimitReached && (
-            <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>
-                  <strong>Four-Document Limit Reached:</strong> Catchy ACCA supports up to {MAX_STUDY_MATERIALS} active study documents in local browser storage ({materials.length} stored). To import another document, please replace or delete an existing material.
-                </span>
-              </div>
-            </div>
-          )}
 
           {/* Search & Filter Bar */}
           <div className="flex flex-col sm:flex-row gap-3">
@@ -591,159 +599,155 @@ export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
               </button>
             </div>
 
-            {isLimitReached ? (
-              <div className="space-y-4 text-xs">
-                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 space-y-2">
-                  <div className="flex items-center space-x-2 font-bold text-amber-400">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span>Four-Document Storage Limit Reached</span>
-                  </div>
-                  <p>
-                    Catchy ACCA allows a maximum of <strong>4 active study documents</strong> in local offline storage ({materials.length} currently stored).
-                  </p>
-                  <p>
-                    Please replace an existing material or delete an unused document before adding another.
-                  </p>
+            <form onSubmit={handleSaveUpload} className="space-y-4 text-xs">
+              {uploadError && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{uploadError}</span>
                 </div>
-                <div className="flex justify-end pt-2">
-                  <button
-                    onClick={() => setIsUploading(false)}
-                    className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl font-bold"
+              )}
+
+              <div>
+                <label className="block text-gray-300 font-bold mb-1">
+                  {selectedFiles.length > 1 ? 'Document Titles' : 'Document Display Title'}
+                </label>
+                <input
+                  type="text"
+                  value={uploadTitle}
+                  onChange={e => setUploadTitle(e.target.value)}
+                  placeholder={selectedFiles.length > 1 ? "Individual filenames will be used automatically" : "e.g. SBR Exam Kit 2026 / FR BPP Revision Text"}
+                  disabled={selectedFiles.length > 1}
+                  required={selectedFiles.length <= 1}
+                  className={`w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-white outline-none focus:border-acca-red ${selectedFiles.length > 1 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">
+                    ACCA Paper
+                  </label>
+                  <select
+                    value={uploadPaperId}
+                    onChange={e => setUploadPaperId(e.target.value)}
+                    className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-white outline-none focus:border-acca-red font-semibold"
                   >
-                    Close
-                  </button>
+                    {version.papers.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.id} — {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">
+                    Material Type
+                  </label>
+                  <select
+                    value={uploadMaterialType}
+                    onChange={e => setUploadMaterialType(e.target.value as MaterialTypeOption)}
+                    className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-white outline-none focus:border-acca-red font-semibold"
+                  >
+                    {MATERIAL_TYPE_OPTIONS.map(opt => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-            ) : (
-              <form onSubmit={handleSaveUpload} className="space-y-4 text-xs">
-                {uploadError && (
-                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center space-x-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>{uploadError}</span>
-                  </div>
-                )}
 
-                <div>
-                  <label className="block text-gray-300 font-bold mb-1">
-                    Document Display Title
-                  </label>
+              {/* Drag and Drop Zone */}
+              <div>
+                <label className="block text-gray-300 font-bold mb-1">
+                  PDF Document(s) (Max {formatFileSize(MAX_PDF_FILE_SIZE_BYTES)} each)
+                </label>
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${
+                    isDragOver
+                      ? 'border-acca-red bg-acca-red/10'
+                      : selectedFiles.length > 0
+                      ? 'border-emerald-500/50 bg-emerald-500/5'
+                      : 'border-[#2a2a34] hover:border-[#3d3d4d] bg-[#141419]'
+                  }`}
+                >
                   <input
-                    type="text"
-                    value={uploadTitle}
-                    onChange={e => setUploadTitle(e.target.value)}
-                    placeholder="e.g. SBR Exam Kit 2026 / FR BPP Revision Text"
-                    required
-                    className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-white outline-none focus:border-acca-red"
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".pdf,application/pdf"
+                    multiple
+                    onChange={handleFileChange}
+                    className="hidden"
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-gray-300 font-bold mb-1">
-                      ACCA Paper
-                    </label>
-                    <select
-                      value={uploadPaperId}
-                      onChange={e => setUploadPaperId(e.target.value)}
-                      className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-white outline-none focus:border-acca-red font-semibold"
-                    >
-                      {version.papers.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.id} — {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-300 font-bold mb-1">
-                      Material Type
-                    </label>
-                    <select
-                      value={uploadMaterialType}
-                      onChange={e => setUploadMaterialType(e.target.value as MaterialTypeOption)}
-                      className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-white outline-none focus:border-acca-red font-semibold"
-                    >
-                      {MATERIAL_TYPE_OPTIONS.map(opt => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Drag and Drop Zone */}
-                <div>
-                  <label className="block text-gray-300 font-bold mb-1">
-                    PDF Document (Max {formatFileSize(MAX_PDF_FILE_SIZE_BYTES)})
-                  </label>
-                  <div
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${
-                      isDragOver
-                        ? 'border-acca-red bg-acca-red/10'
-                        : selectedFile
-                        ? 'border-emerald-500/50 bg-emerald-500/5'
-                        : 'border-[#2a2a34] hover:border-[#3d3d4d] bg-[#141419]'
-                    }`}
-                  >
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      accept=".pdf,application/pdf"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                    {selectedFile ? (
-                      <div className="space-y-1">
-                        <CheckCircle2 className="w-6 h-6 text-emerald-400 mx-auto" />
-                        <div className="font-bold text-white text-xs">{selectedFile.name}</div>
-                        <div className="text-[11px] text-gray-400">{formatFileSize(selectedFile.size)}</div>
-                        <div className="text-[10px] text-gray-500">Click to choose another file</div>
+                  {selectedFiles.length === 1 ? (
+                    <div className="space-y-1">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400 mx-auto" />
+                      <div className="font-bold text-white text-xs">{selectedFiles[0].name}</div>
+                      <div className="text-[11px] text-gray-400">{formatFileSize(selectedFiles[0].size)}</div>
+                      <div className="text-[10px] text-gray-500">Click or drop to change or select multiple files</div>
+                    </div>
+                  ) : selectedFiles.length > 1 ? (
+                    <div className="space-y-1 text-left max-h-36 overflow-y-auto px-2">
+                      <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs mb-1">
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span>{selectedFiles.length} files selected ({formatFileSize(selectedFiles.reduce((acc, f) => acc + f.size, 0))})</span>
                       </div>
-                    ) : (
-                      <div className="space-y-1 text-gray-400">
-                        <FileText className="w-6 h-6 text-gray-500 mx-auto mb-1" />
-                        <div className="font-semibold text-gray-200">
-                          Click to select PDF or drag and drop here
-                        </div>
-                        <div className="text-[11px] text-gray-500">
-                          Stored locally in your browser IndexedDB
-                        </div>
+                      <ul className="space-y-0.5 text-[11px] text-gray-300">
+                        {selectedFiles.slice(0, 5).map((f, i) => (
+                          <li key={i} className="truncate">• {f.name} ({formatFileSize(f.size)})</li>
+                        ))}
+                        {selectedFiles.length > 5 && (
+                          <li className="text-gray-500 italic">+ {selectedFiles.length - 5} more files</li>
+                        )}
+                      </ul>
+                      <div className="text-[10px] text-gray-500 pt-1 text-center">Click or drop to change selection</div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 text-gray-400">
+                      <FileText className="w-6 h-6 text-gray-500 mx-auto mb-1" />
+                      <div className="font-semibold text-gray-200">
+                        Click to select PDF(s) or drag and drop here
                       </div>
-                    )}
-                  </div>
+                      <div className="text-[11px] text-gray-500">
+                        Select one or multiple files • Stored locally in IndexedDB
+                      </div>
+                    </div>
+                  )}
                 </div>
+              </div>
 
-                <div className="flex justify-end space-x-2 pt-2 border-t border-[#2a2a34]">
-                  <button
-                    type="button"
-                    onClick={() => setIsUploading(false)}
-                    className="px-4 py-2 bg-[#141419] hover:bg-[#25252e] text-gray-300 rounded-xl font-semibold border border-[#2a2a34]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isProcessingFile || !selectedFile}
-                    className="px-4 py-2 bg-acca-red hover:bg-acca-red-hover disabled:opacity-40 text-white rounded-xl font-bold flex items-center space-x-1.5"
-                  >
-                    {isProcessingFile ? (
-                      <>
-                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Validating PDF...</span>
-                      </>
-                    ) : (
-                      <span>Import Document</span>
-                    )}
-                  </button>
-                </div>
-              </form>
-            )}
+              <div className="flex justify-end space-x-2 pt-2 border-t border-[#2a2a34]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUploading(false);
+                    setSelectedFiles([]);
+                  }}
+                  className="px-4 py-2 bg-[#141419] hover:bg-[#25252e] text-gray-300 rounded-xl font-semibold border border-[#2a2a34]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingFile || selectedFiles.length === 0}
+                  className="px-4 py-2 bg-acca-red hover:bg-acca-red-hover disabled:opacity-40 text-white rounded-xl font-bold flex items-center space-x-1.5"
+                >
+                  {isProcessingFile ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Validating & Importing...</span>
+                    </>
+                  ) : (
+                    <span>{selectedFiles.length > 1 ? `Import ${selectedFiles.length} Documents` : 'Import Document'}</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

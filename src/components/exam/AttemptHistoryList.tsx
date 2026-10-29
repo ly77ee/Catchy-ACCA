@@ -68,7 +68,7 @@ export const AttemptHistoryList: React.FC<AttemptHistoryListProps> = ({
             <div
               key={att.id}
               onClick={() => onSelectAttempt(att)}
-              className="bg-white rounded-2xl border border-gray-200/80 hover:border-gray-300 p-5 shadow-xs transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+              className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] hover:border-[#3a3a46] p-5 shadow-xs transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
             >
               <div className="flex items-center space-x-4">
                 <CircularProgress
@@ -79,16 +79,16 @@ export const AttemptHistoryList: React.FC<AttemptHistoryListProps> = ({
                 />
                 <div>
                   <div className="flex items-center space-x-2">
-                    <span className="font-black text-gray-900 text-base group-hover:text-acca-red transition-colors">
+                    <span className="font-black text-white text-base group-hover:text-acca-red transition-colors">
                       {att.paperId} Simulation
                     </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      isPassed ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-acca-red'
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      isPassed ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50' : 'bg-red-950/40 text-acca-red border-red-800/50'
                     }`}>
                       {isPassed ? 'PASS' : 'REVISION NEEDED'}
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mt-1">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 mt-1">
                     <span className="flex items-center space-x-1">
                       <Calendar className="w-3.5 h-3.5" />
                       <span>{new Date(att.completedAt || att.startedAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}</span>
@@ -104,9 +104,9 @@ export const AttemptHistoryList: React.FC<AttemptHistoryListProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between sm:justify-end space-x-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+              <div className="flex items-center justify-between sm:justify-end space-x-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#2a2a34]">
                 <div className="text-right">
-                  <span className="font-extrabold text-sm text-gray-900">
+                  <span className="font-extrabold text-sm text-white">
                     {att.totalMarksScored} / {att.totalMarksAvailable} Marks
                   </span>
                   <span className="block text-xs font-semibold text-gray-400">
@@ -117,7 +117,7 @@ export const AttemptHistoryList: React.FC<AttemptHistoryListProps> = ({
                 <div className="flex items-center space-x-1">
                   <button
                     onClick={(e) => handleDeleteAttempt(att.id, e)}
-                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-950/30 rounded-lg transition-colors"
                     title="Delete attempt"
                   >
                     <Trash2 className="w-4 h-4" />

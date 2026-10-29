@@ -8,40 +8,40 @@ interface BadgeProps {
 }
 
 export const Badge: React.FC<BadgeProps> = ({ status, text, className = '' }) => {
-  let colorStyles = 'bg-gray-100 text-gray-700 border-gray-200';
+  let colorStyles = 'bg-[#141419] text-gray-400 border-[#2a2a34]';
   let defaultLabel = text || 'Status';
 
   switch (status) {
     case 'passed':
-      colorStyles = 'bg-emerald-50 text-emerald-800 border-emerald-300';
+      colorStyles = 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50';
       defaultLabel = text || 'Passed';
       break;
     case 'in_progress':
-      colorStyles = 'bg-amber-50 text-amber-800 border-amber-300';
+      colorStyles = 'bg-amber-950/40 text-amber-300 border-amber-800/50';
       defaultLabel = text || 'In Progress';
       break;
     case 'exempt':
-      colorStyles = 'bg-blue-50 text-blue-800 border-blue-300';
+      colorStyles = 'bg-blue-950/40 text-blue-300 border-blue-800/50';
       defaultLabel = text || 'Exempt';
       break;
     case 'not_started':
-      colorStyles = 'bg-gray-100 text-gray-600 border-gray-300';
+      colorStyles = 'bg-[#141419] text-gray-400 border-[#2a2a34]';
       defaultLabel = text || 'Not Started';
       break;
     case 'attempted':
-      colorStyles = 'bg-indigo-50 text-indigo-800 border-indigo-300';
+      colorStyles = 'bg-indigo-950/40 text-indigo-300 border-indigo-800/50';
       defaultLabel = text || 'Attempted';
       break;
     case 'completed':
-      colorStyles = 'bg-emerald-50 text-emerald-800 border-emerald-300';
+      colorStyles = 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50';
       defaultLabel = text || 'Completed';
       break;
     case 'needs_review':
-      colorStyles = 'bg-orange-50 text-orange-800 border-orange-300';
+      colorStyles = 'bg-orange-950/40 text-orange-300 border-orange-800/50';
       defaultLabel = text || 'Needs Review';
       break;
     case 'doubt':
-      colorStyles = 'bg-red-50 text-red-700 border-red-300 font-semibold';
+      colorStyles = 'bg-red-950/50 text-red-300 border-red-800/50 font-semibold';
       defaultLabel = text || 'Doubt';
       break;
   }

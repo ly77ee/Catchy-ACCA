@@ -9,7 +9,7 @@ import { SpreadsheetWorkspace } from '../components/spreadsheet/SpreadsheetWorks
 import { AnswerWriter } from '../components/writer/AnswerWriter';
 import { db } from '../db';
 import { QUALIFICATION_VERSIONS } from '../config/accaStructure';
-import { MAX_STUDY_MATERIALS, getMaterialDisplayName } from '../config/studyMaterials';
+import { getMaterialDisplayName } from '../config/studyMaterials';
 import { StudyMaterial } from '../types';
 import { evaluateFortuneFormula, createDefaultFortuneSheets } from '../utils/fortuneSheetAdapter';
 
@@ -159,8 +159,8 @@ describe('Catchy ACCA: Unified Sidebar, Shared Materials & Full-Screen Workspace
   /* -------------------------------------------------------------------------- */
   /* B. SHARED STUDY MATERIALS LIBRARY & 4-DOCUMENT LIMIT                       */
   /* -------------------------------------------------------------------------- */
-  describe('B. Shared Study Materials Library & Four-Document Limit', () => {
-    it('1. Displays usage indicator (X of 4 materials used) and allows uploading up to 4 items', async () => {
+  describe('B. Shared Study Materials Library & Unlimited Storage Support', () => {
+    it('1. Displays usage indicator (X materials stored) and renders library items', async () => {
       const sampleMaterials: StudyMaterial[] = [
         {
           id: 'mat-1',
@@ -199,8 +199,8 @@ describe('Catchy ACCA: Unified Sidebar, Shared Materials & Full-Screen Workspace
         />
       );
 
-      // Verify indicator shows 2 of 4 materials used
-      expect(screen.getByText(`2 of ${MAX_STUDY_MATERIALS} materials used`)).toBeDefined();
+      // Verify indicator shows 2 materials stored
+      expect(screen.getByText('2 materials stored')).toBeDefined();
 
       // Verify Material sequence labels
       expect(screen.getByText('Material 1')).toBeDefined();
@@ -209,8 +209,8 @@ describe('Catchy ACCA: Unified Sidebar, Shared Materials & Full-Screen Workspace
       expect(screen.getByText('FR Complete Study Text')).toBeDefined();
     });
 
-    it('2. Blocks 5th upload when 4 materials already exist', async () => {
-      const fourMaterials: StudyMaterial[] = [1, 2, 3, 4].map((num) => ({
+    it('2. Does not limit uploads to 4 items and allows 5 or more materials with active import button', async () => {
+      const fiveMaterials: StudyMaterial[] = [1, 2, 3, 4, 5].map((num) => ({
         id: `mat-${num}`,
         title: `Material ${num} Text`,
         fileName: `file_${num}.pdf`,
@@ -223,27 +223,27 @@ describe('Catchy ACCA: Unified Sidebar, Shared Materials & Full-Screen Workspace
         pdfData: new ArrayBuffer(100),
       }));
 
-      for (const m of fourMaterials) {
+      for (const m of fiveMaterials) {
         await db.studyMaterials.put(m);
       }
 
       render(
         <StudyMaterials
           version={mockVersion}
-          materials={fourMaterials}
+          materials={fiveMaterials}
         />
       );
 
-      // Verify indicator shows 4 of 4 materials used
-      expect(screen.getByText(`4 of ${MAX_STUDY_MATERIALS} materials used`)).toBeDefined();
+      // Verify indicator shows 5 materials stored
+      expect(screen.getByText('5 materials stored')).toBeDefined();
 
-      // Verify limit reached alert is displayed
-      expect(screen.getByText(/Four-Document Limit Reached:/i)).toBeDefined();
+      // Verify no limit alert is displayed
+      expect(screen.queryByText(/Four-Document Limit Reached:/i)).toBeNull();
 
-      // Verify import button is disabled
-      const importBtn = screen.getByTitle(`Limit of ${MAX_STUDY_MATERIALS} materials reached`);
+      // Verify import button remains active and clickable
+      const importBtn = screen.getByTitle('Import PDF Material');
       expect(importBtn).toBeDefined();
-      expect(importBtn.hasAttribute('disabled')).toBe(true);
+      expect(importBtn.hasAttribute('disabled')).toBe(false);
     });
 
     it('3. Renaming material updates title in IndexedDB while preserving stable ID', async () => {

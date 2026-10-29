@@ -17,7 +17,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
   size = 64,
   strokeWidth = 6,
   color = '#C00000',
-  trackColor = '#E5E7EB',
+  trackColor = '#2a2a34',
   showText = true,
   subLabel,
   customText,
@@ -70,14 +70,14 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
       {showText && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
           <span
-            className="font-bold leading-none text-gray-900"
+            className="font-bold leading-none text-white"
             style={{ fontSize: Math.max(10, Math.floor(size * 0.22)) }}
           >
             {customText !== undefined ? customText : `${normalizedPercentage}%`}
           </span>
           {subLabel && (
             <span
-              className="text-gray-500 font-medium tracking-tight mt-0.5 uppercase"
+              className="text-gray-400 font-medium tracking-tight mt-0.5 uppercase"
               style={{ fontSize: Math.max(8, Math.floor(size * 0.1)) }}
             >
               {subLabel}
