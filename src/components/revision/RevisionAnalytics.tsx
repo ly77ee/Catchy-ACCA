@@ -208,7 +208,7 @@ export const RevisionAnalytics: React.FC<RevisionAnalyticsProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold text-charcoal-900 dark:text-charcoal-100">
-                  Revision & Progress Analytics
+                  Progress
                 </h1>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-charcoal-100 dark:bg-charcoal-800 text-charcoal-700 dark:text-charcoal-300">
                   Catchy ACCA · by ly77ee

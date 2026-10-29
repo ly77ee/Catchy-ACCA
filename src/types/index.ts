@@ -73,9 +73,13 @@ export interface StudyPlanItem {
   id: string;
   title: string;
   paperId?: string;
+  topic?: string;
   estimatedMinutes?: number;
   completed: boolean;
   dueDate: string; // YYYY-MM-DD
+  startTime?: string; // HH:mm e.g. "09:00"
+  endTime?: string; // HH:mm e.g. "10:30"
+  notes?: string;
   createdAt: string;
 }
 
@@ -392,6 +396,29 @@ export interface AccaNewsItem {
   fetchedAt?: string;
 }
 
+// Catchy Notes Types
+export interface NoteFolder {
+  id: string;
+  name: string;
+  parentId?: string | null;
+  order?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CatchyNote {
+  id: string;
+  title: string;
+  contentHtml: string;
+  plainText: string;
+  folderId?: string | null; // null/undefined for All Notes / unfiled
+  isPinned?: boolean;
+  isDeleted?: boolean; // in Recently Deleted
+  deletedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BackupPayload {
   version: string;
   exportedAt: string;
@@ -410,6 +437,8 @@ export interface BackupPayload {
   checklistItems?: ChecklistItem[];
   newsCache?: AccaNewsItem[];
   annotations?: DocumentAnnotation[];
+  notes?: CatchyNote[];
+  noteFolders?: NoteFolder[];
   aiConfig?: AIProviderConfig;
   answerReviews?: AnswerReviewResult[];
 }

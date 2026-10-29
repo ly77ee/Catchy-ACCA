@@ -199,7 +199,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             className="px-3.5 py-2 bg-acca-red hover:bg-acca-red-hover text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
           >
             <CheckSquare className="w-4 h-4" />
-            <span>Open Study Checklist</span>
+            <span>Open Question Checklist</span>
           </button>
         </div>
       </div>
@@ -287,7 +287,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="flex items-center gap-2">
                 <CheckSquare className="w-4 h-4 text-acca-red" />
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Markdown Study Checklist
+                  Markdown Question Checklist
                 </h2>
               </div>
               <span className="text-[11px] text-gray-400">Obsidian Compatible</span>

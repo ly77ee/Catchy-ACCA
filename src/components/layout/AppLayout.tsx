@@ -23,7 +23,8 @@ import {
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
-  User
+  User,
+  FileText
 } from 'lucide-react';
 import { CircularProgress } from '../common/CircularProgress';
 import {
@@ -109,14 +110,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       items: [
         { id: 'my-acca', label: 'My ACCA', icon: GraduationCap },
         { id: 'exam-planner', label: 'Exam Planner', icon: Calendar },
-        { id: 'revision-progress', label: 'Revision & Progress', icon: TrendingUp },
-        { id: 'topic-grouping', label: 'Topic Grouping', icon: Layers },
+        { id: 'revision-progress', label: 'Progress', icon: TrendingUp },
+        { id: 'catchy-notes', label: 'Catchy Notes', icon: FileText },
       ],
     },
     {
       title: 'Study',
       items: [
-        { id: 'checklist', label: 'Study Checklist', icon: CheckSquare },
+        { id: 'checklist', label: 'Question Checklist', icon: CheckSquare },
         { id: 'study-materials', label: 'Study Materials', icon: BookOpen },
         { id: 'exam-environment', label: 'Mock Exams', icon: FileCheck },
         { id: 'excel', label: 'Excel', icon: Table2 },
@@ -148,7 +149,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     if (item.id === 'exam-environment' && (activeTab === 'exam-environment' || activeTab === 'mock-exams')) return true;
     if (item.id === 'excel' && activeTab === 'excel-workspace') return true;
     if (item.id === 'word' && activeTab === 'answer-writer') return true;
-    if (item.id === 'checklist' && activeTab === 'study-checklist') return true;
+    if (item.id === 'checklist' && (activeTab === 'study-checklist' || activeTab === 'question-checklist')) return true;
+    if (item.id === 'revision-progress' && activeTab === 'progress') return true;
+    if (item.id === 'catchy-notes' && (activeTab === 'notes' || activeTab === 'topic-grouping')) return true;
     if (item.id === 'profile' && activeTab === 'profile') return true;
     return false;
   };

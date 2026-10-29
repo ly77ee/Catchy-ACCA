@@ -13,7 +13,9 @@ import {
   ChecklistRecord,
   ChecklistItem,
   AccaNewsItem,
-  DocumentAnnotation
+  DocumentAnnotation,
+  NoteFolder,
+  CatchyNote
 } from '../types';
 
 export class CatchyAccaDatabase extends Dexie {
@@ -30,6 +32,8 @@ export class CatchyAccaDatabase extends Dexie {
   checklistItems!: Table<ChecklistItem, string>;
   newsCache!: Table<AccaNewsItem, string>;
   annotations!: Table<DocumentAnnotation, string>;
+  notes!: Table<CatchyNote, string>;
+  noteFolders!: Table<NoteFolder, string>;
 
   constructor() {
     super('CatchyAccaDB');
@@ -69,6 +73,12 @@ export class CatchyAccaDatabase extends Dexie {
     // Version 6 adds document persistent annotations and highlights
     this.version(6).stores({
       annotations: 'id, materialId, pageNumber, createdAt'
+    });
+
+    // Version 7 adds Catchy Notes and folders
+    this.version(7).stores({
+      notes: 'id, folderId, isPinned, isDeleted, updatedAt, createdAt',
+      noteFolders: 'id, parentId, updatedAt, createdAt'
     });
   }
 }
@@ -377,6 +387,8 @@ export async function createBackupPayload(versionId: string): Promise<BackupPayl
   const checklistItems = await db.checklistItems.toArray();
   const newsCache = await db.newsCache.toArray();
   const annotations = await db.annotations.toArray();
+  const notes = await db.notes.toArray();
+  const noteFolders = await db.noteFolders.toArray();
 
   // Strip large binary blobs from JSON backup for safety & portability
   const sanitizedMaterials = studyMaterials.map(({ pdfData, ...rest }) => rest);
@@ -398,7 +410,9 @@ export async function createBackupPayload(versionId: string): Promise<BackupPayl
     checklists,
     checklistItems,
     newsCache,
-    annotations
+    annotations,
+    notes,
+    noteFolders
   };
 }
 
@@ -468,7 +482,9 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       db.checklists,
       db.checklistItems,
       db.newsCache,
-      db.annotations
+      db.annotations,
+      db.notes,
+      db.noteFolders
     ], async () => {
       await db.paperRecords.clear();
       await db.questions.clear();
@@ -482,6 +498,8 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       await db.checklistItems.clear();
       await db.newsCache.clear();
       await db.annotations.clear();
+      await db.notes.clear();
+      await db.noteFolders.clear();
 
       if (payload.paperRecords?.length) await db.paperRecords.bulkPut(payload.paperRecords);
       if (payload.questions?.length) await db.questions.bulkPut(payload.questions);
@@ -495,6 +513,8 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       if (payload.checklistItems?.length) await db.checklistItems.bulkPut(payload.checklistItems);
       if (payload.newsCache?.length) await db.newsCache.bulkPut(payload.newsCache);
       if (payload.annotations?.length) await db.annotations.bulkPut(payload.annotations);
+      if (payload.notes?.length) await db.notes.bulkPut(payload.notes);
+      if (payload.noteFolders?.length) await db.noteFolders.bulkPut(payload.noteFolders);
     });
   } else {
     // Merge mode: upsert records
@@ -509,6 +529,8 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
     if (payload.checklistItems?.length) await db.checklistItems.bulkPut(payload.checklistItems);
     if (payload.newsCache?.length) await db.newsCache.bulkPut(payload.newsCache);
     if (payload.annotations?.length) await db.annotations.bulkPut(payload.annotations);
+    if (payload.notes?.length) await db.notes.bulkPut(payload.notes);
+    if (payload.noteFolders?.length) await db.noteFolders.bulkPut(payload.noteFolders);
   }
 
   await logActivity(
@@ -544,5 +566,165 @@ export async function deleteAnnotation(id: string): Promise<void> {
     await db.annotations.delete(id);
   } catch (err) {
     console.error('Failed to delete annotation:', err);
+  }
+}
+
+// ============================================================================
+// Catchy Notes & Folders Helpers
+// ============================================================================
+
+export async function getNotes(options?: {
+  folderId?: string | null;
+  includeDeleted?: boolean;
+  searchQuery?: string;
+}): Promise<CatchyNote[]> {
+  try {
+    let all = await db.notes.toArray();
+
+    if (!options?.includeDeleted) {
+      all = all.filter(n => !n.isDeleted);
+    } else if (options?.includeDeleted === true) {
+      all = all.filter(n => n.isDeleted);
+    }
+
+    if (options?.folderId !== undefined && options?.folderId !== null) {
+      all = all.filter(n => n.folderId === options.folderId);
+    }
+
+    if (options?.searchQuery && options.searchQuery.trim()) {
+      const q = options.searchQuery.toLowerCase().trim();
+      all = all.filter(n =>
+        n.title.toLowerCase().includes(q) ||
+        n.plainText.toLowerCase().includes(q)
+      );
+    }
+
+    // Default sorting: pinned first, then newest updatedAt
+    all.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+
+    return all;
+  } catch (err) {
+    console.error('Failed to fetch notes:', err);
+    return [];
+  }
+}
+
+export async function saveNote(note: CatchyNote): Promise<void> {
+  try {
+    await db.notes.put(note);
+  } catch (err) {
+    console.error('Failed to save note:', err);
+    throw err;
+  }
+}
+
+export async function deleteNote(id: string, permanent: boolean = false): Promise<void> {
+  try {
+    if (permanent) {
+      await db.notes.delete(id);
+    } else {
+      const note = await db.notes.get(id);
+      if (note) {
+        await db.notes.put({
+          ...note,
+          isDeleted: true,
+          deletedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to delete note:', err);
+    throw err;
+  }
+}
+
+export async function restoreNote(id: string): Promise<void> {
+  try {
+    const note = await db.notes.get(id);
+    if (note) {
+      await db.notes.put({
+        ...note,
+        isDeleted: false,
+        deletedAt: undefined,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  } catch (err) {
+    console.error('Failed to restore note:', err);
+    throw err;
+  }
+}
+
+export async function getNoteFolders(): Promise<NoteFolder[]> {
+  try {
+    const folders = await db.noteFolders.toArray();
+    folders.sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
+    return folders;
+  } catch (err) {
+    console.error('Failed to fetch note folders:', err);
+    return [];
+  }
+}
+
+export async function saveNoteFolder(folder: NoteFolder): Promise<void> {
+  try {
+    await db.noteFolders.put(folder);
+  } catch (err) {
+    console.error('Failed to save note folder:', err);
+    throw err;
+  }
+}
+
+export async function deleteNoteFolder(
+  folderId: string,
+  strategy: 'move_to_parent' | 'delete_notes' = 'move_to_parent'
+): Promise<void> {
+  try {
+    const targetFolder = await db.noteFolders.get(folderId);
+    const parentId = targetFolder?.parentId || null;
+
+    // Find all subfolders and notes in this folder
+    const allNotes = await db.notes.where('folderId').equals(folderId).toArray();
+    const allSubfolders = await db.noteFolders.where('parentId').equals(folderId).toArray();
+
+    if (strategy === 'move_to_parent') {
+      // Move notes to parent folder or root
+      for (const note of allNotes) {
+        await db.notes.put({
+          ...note,
+          folderId: parentId,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      // Re-parent subfolders
+      for (const sub of allSubfolders) {
+        await db.noteFolders.put({
+          ...sub,
+          parentId: parentId,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    } else {
+      // Soft-delete notes inside this folder
+      for (const note of allNotes) {
+        await db.notes.put({
+          ...note,
+          isDeleted: true,
+          deletedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    // Delete the folder itself
+    await db.noteFolders.delete(folderId);
+  } catch (err) {
+    console.error('Failed to delete note folder:', err);
+    throw err;
   }
 }

@@ -29,6 +29,7 @@ import { AIAssistant } from './components/ai/AIAssistant';
 import { RevisionAnalytics } from './components/revision/RevisionAnalytics';
 import { ExamPlanner } from './components/planner/ExamPlanner';
 import { TopicGrouping } from './components/topics/TopicGrouping';
+import { CatchyNotes } from './components/notes/CatchyNotes';
 import { AccaNews } from './components/news/AccaNews';
 
 // Icons for Future Modules
@@ -137,8 +138,8 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Tab: Study Checklist (Markdown / Obsidian inspired) */}
-      {(activeTab === 'checklist' || activeTab === 'study-checklist') && (
+      {/* Tab: Question Checklist (Markdown / Obsidian inspired) */}
+      {(activeTab === 'checklist' || activeTab === 'study-checklist' || activeTab === 'question-checklist') && (
         <StudyChecklist
           version={activeVersion}
           onNavigateToPaper={handleSelectPaper}
@@ -244,8 +245,8 @@ export const App: React.FC = () => {
         </WorkspaceSplitLayout>
       )}
 
-      {/* Tab: Revision & Progress Analytics */}
-      {activeTab === 'revision-progress' && (
+      {/* Tab: Progress Analytics */}
+      {(activeTab === 'revision-progress' || activeTab === 'progress') && (
         <RevisionAnalytics
           version={activeVersion}
           allQuestions={questions || []}
@@ -277,7 +278,12 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Tab: Topic Grouping */}
+      {/* Tab: Catchy Notes */}
+      {(activeTab === 'catchy-notes' || activeTab === 'notes') && (
+        <CatchyNotes version={activeVersion} />
+      )}
+
+      {/* Tab: Topic Grouping (Fallback / Direct navigation) */}
       {activeTab === 'topic-grouping' && (
         <TopicGrouping
           version={activeVersion}

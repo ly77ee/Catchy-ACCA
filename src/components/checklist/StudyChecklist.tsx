@@ -228,7 +228,7 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
             </div>
             <div>
               <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
-                Study Checklist
+                Question Checklist
                 <span className="text-[11px] font-semibold bg-[#141419] text-gray-400 px-2 py-0.5 rounded-md border border-[#2a2a34]">
                   Obsidian Markdown Compatible
                 </span>
@@ -571,7 +571,7 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
               <div>
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
                   <CheckSquare className="w-4 h-4 text-acca-red" />
-                  Paste Markdown Study Checklist
+                  Paste Markdown Question Checklist
                 </h2>
                 <p className="text-xs text-gray-400 mt-0.5">
                   Paste Obsidian Markdown checklist with headings (# Paper, ## Section) and checkboxes (- [ ] Question)

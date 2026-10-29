@@ -59,3 +59,66 @@ export function formatCalendarDate(dateStr?: string): string {
     year: 'numeric'
   });
 }
+
+/**
+ * Returns YYYY-MM-DD for a given Date in local time, preventing UTC midnight shifts.
+ */
+export function toLocalDateString(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Returns Monday as the start of the week for any given date.
+ */
+export function getStartOfWeek(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay();
+  // day 0 is Sunday, 1 is Monday...
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Returns array of 7 dates for the week starting from startOfWeek (Mon to Sun).
+ */
+export function getWeekDates(startOfWeek: Date): { date: Date; dateStr: string; dayName: string; dayNumber: number }[] {
+  const days: { date: Date; dateStr: string; dayName: string; dayNumber: number }[] = [];
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  for (let i = 0; i < 7; i++) {
+    const cur = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + i);
+    days.push({
+      date: cur,
+      dateStr: toLocalDateString(cur),
+      dayName: dayNames[i],
+      dayNumber: cur.getDate(),
+    });
+  }
+  return days;
+}
+
+/**
+ * Formats a weekly range (e.g., "Oct 26 – Nov 1, 2026")
+ */
+export function formatWeekRange(startOfWeek: Date): string {
+  const endOfWeek = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + 6);
+
+  const startMonth = startOfWeek.toLocaleDateString('en-US', { month: 'short' });
+  const endMonth = endOfWeek.toLocaleDateString('en-US', { month: 'short' });
+  const startYear = startOfWeek.getFullYear();
+  const endYear = endOfWeek.getFullYear();
+
+  if (startYear !== endYear) {
+    return `${startMonth} ${startOfWeek.getDate()}, ${startYear} – ${endMonth} ${endOfWeek.getDate()}, ${endYear}`;
+  }
+  if (startMonth !== endMonth) {
+    return `${startMonth} ${startOfWeek.getDate()} – ${endMonth} ${endOfWeek.getDate()}, ${startYear}`;
+  }
+  return `${startMonth} ${startOfWeek.getDate()} – ${endOfWeek.getDate()}, ${startYear}`;
+}
+
