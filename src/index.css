@@ -28,3 +28,106 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #3a3a46;
 }
+
+/* ==========================================================================
+   FortuneSheet Spreadsheet Dark ACCA Theme Overrides
+   ========================================================================== */
+.catchy-spreadsheet-host {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.catchy-spreadsheet-host .fortune-container {
+  background-color: #141419 !important;
+  color: #e5e7eb !important;
+  font-family: inherit;
+}
+
+.catchy-spreadsheet-host .fortune-workarea {
+  background-color: #141419 !important;
+}
+
+.catchy-spreadsheet-host .fortune-toolbar {
+  background-color: #1e1e24 !important;
+  border-bottom: 1px solid #2a2a34 !important;
+  color: #e5e7eb !important;
+  padding: 4px 8px !important;
+}
+
+.catchy-spreadsheet-host .fortune-toolbar-button {
+  color: #d1d5db !important;
+  fill: #d1d5db !important;
+  border-radius: 6px !important;
+}
+
+.catchy-spreadsheet-host .fortune-toolbar-button:hover,
+.catchy-spreadsheet-host .fortune-toolbar-button-selected {
+  background-color: #2a2a34 !important;
+  color: #ffffff !important;
+}
+
+.catchy-spreadsheet-host .fortune-toolbar-divider {
+  border-left: 1px solid #2e2e3a !important;
+}
+
+.catchy-spreadsheet-host .fortune-fx-editor {
+  background-color: #18181f !important;
+  border-bottom: 1px solid #2a2a34 !important;
+  color: #e5e7eb !important;
+  padding: 4px 8px !important;
+}
+
+.catchy-spreadsheet-host .fortune-fx-name {
+  background-color: #22222b !important;
+  color: #f3f4f6 !important;
+  border: 1px solid #2a2a34 !important;
+  border-radius: 6px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+}
+
+.catchy-spreadsheet-host .fortune-fx-input {
+  color: #f3f4f6 !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+}
+
+.catchy-spreadsheet-host .luckysheet-sheet-area {
+  background-color: #18181f !important;
+  border-top: 1px solid #2a2a34 !important;
+  color: #d1d5db !important;
+}
+
+.catchy-spreadsheet-host .luckysheet-sheets-item {
+  background-color: #22222b !important;
+  color: #9ca3af !important;
+  border: 1px solid #2a2a34 !important;
+  border-radius: 6px 6px 0 0 !important;
+}
+
+.catchy-spreadsheet-host .luckysheet-sheets-item-active {
+  background-color: #1e1e24 !important;
+  color: #ffffff !important;
+  border-top: 2px solid #c00000 !important;
+  font-weight: 600 !important;
+}
+
+.catchy-spreadsheet-host .fortune-sheettab-button {
+  color: #9ca3af !important;
+  fill: #9ca3af !important;
+}
+
+.catchy-spreadsheet-host .fortune-sheettab-button:hover {
+  background-color: #2a2a34 !important;
+  color: #ffffff !important;
+}
+
+.catchy-spreadsheet-host .fortune-stat-area {
+  background-color: #18181f !important;
+  border-top: 1px solid #2a2a34 !important;
+  color: #9ca3af !important;
+  font-size: 11px !important;
+}
+

@@ -263,9 +263,11 @@ export interface SpreadsheetWorkbook {
   id: string;
   questionId?: string;
   paperId: string;
+  examAttemptId?: string;
   title: string;
   activeSheetIndex: number;
   sheets: SpreadsheetSheet[];
+  fortuneData?: any[];
   createdAt: string;
   updatedAt: string;
 }
