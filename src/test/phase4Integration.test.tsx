@@ -26,7 +26,7 @@ describe('Phase 4 AI Assistance, Answer Review, and Quality Integration Workflow
     localStorage.clear();
   });
 
-  it('1. Verifies AI configuration persistence and consent protection', () => {
+  it('1. Verifies AI configuration persistence and consent protection', async () => {
     // Default configuration must be offline local with consent set to false
     const defaultConfig = getAIConfig();
     expect(defaultConfig.provider).toBe('offline_local');
@@ -40,10 +40,24 @@ describe('Phase 4 AI Assistance, Answer Review, and Quality Integration Workflow
       hasUserConsent: true,
     });
 
+    // Verify persisted directly in localStorage
+    const rawStored = localStorage.getItem('catchy_acca_ai_config');
+    expect(rawStored).toBeDefined();
+    expect(JSON.parse(rawStored || '{}').provider).toBe('ollama');
+
     const saved = getAIConfig();
     expect(saved.provider).toBe('ollama');
     expect(saved.hasUserConsent).toBe(true);
     expect(saved.modelName).toBe('llama3.2');
+
+    // Verify consent protection: remote provider without explicit consent must throw error
+    await expect(
+      queryAIAssistant('Explain IFRS 16', [], {
+        provider: 'openai',
+        modelName: 'gpt-4o',
+        hasUserConsent: false,
+      })
+    ).rejects.toThrow(/explicit user consent/i);
   });
 
   it('2. Grounded offline AI assistant generates syllabus answers without external API or network', async () => {
