@@ -12,6 +12,11 @@ import {
   fortuneSheetsToSpreadsheetWorkbook,
   FortuneSheetType
 } from '../../utils/fortuneSheetAdapter';
+import {
+  computeNextFormulaReference,
+  FormulaRangeState
+} from '../../utils/formulaKeyboardNavigator';
+import { parseCellAddress } from '../../utils/formulaEngine';
 import { db, logActivity } from '../../db';
 import {
   Table2,
@@ -57,6 +62,8 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
 
   const workbookRef = useRef<WorkbookInstance | null>(null);
+  const hostContainerRef = useRef<HTMLDivElement | null>(null);
+  const rangeNavigationStateRef = useRef<FormulaRangeState | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -135,6 +142,148 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
       }
     };
   }, [selectedPaperId, selectedQuestionId, examAttemptId]);
+
+  // Keyboard Cell-Range Selection Handler while Editing Formulas
+  useEffect(() => {
+    const container = hostContainerRef.current;
+    if (!container) return;
+
+    const handleKeyDownCapture = (e: KeyboardEvent) => {
+      const isArrowKey =
+        e.key === 'ArrowUp' ||
+        e.key === 'ArrowDown' ||
+        e.key === 'ArrowLeft' ||
+        e.key === 'ArrowRight';
+
+      // Find cell input and formula bar input elements
+      const cellInput = container.querySelector<HTMLDivElement>('.luckysheet-cell-input');
+      const fxInput = container.querySelector<HTMLDivElement>('#luckysheet-functionbox-cell');
+      const activeElement = document.activeElement;
+
+      const isCellInputActive =
+        Boolean(activeElement && (cellInput?.contains(activeElement) || activeElement === cellInput));
+      const isFxInputActive =
+        Boolean(activeElement && (fxInput?.contains(activeElement) || activeElement === fxInput));
+
+      if (!isCellInputActive && !isFxInputActive) {
+        rangeNavigationStateRef.current = null;
+        return;
+      }
+
+      const targetInput = isFxInputActive ? fxInput : (cellInput || fxInput);
+      if (!targetInput) return;
+
+      const currentText = targetInput.innerText || targetInput.textContent || '';
+
+      // Auto-balance closing parenthesis on Enter if formula is unclosed
+      if (e.key === 'Enter') {
+        rangeNavigationStateRef.current = null;
+        if (currentText.trim().startsWith('=')) {
+          const openCount = (currentText.match(/\(/g) || []).length;
+          const closeCount = (currentText.match(/\)/g) || []).length;
+          if (openCount > closeCount) {
+            const balanced = currentText + ')'.repeat(openCount - closeCount);
+            if (cellInput) {
+              cellInput.innerText = balanced;
+              cellInput.textContent = balanced;
+            }
+            if (fxInput) {
+              fxInput.innerText = balanced;
+              fxInput.textContent = balanced;
+            }
+          }
+        }
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        rangeNavigationStateRef.current = null;
+        return;
+      }
+
+      // If user types normal text/operators, reset active range selection tracking
+      if (!isArrowKey) {
+        if (e.key !== 'Shift') {
+          rangeNavigationStateRef.current = null;
+        }
+        return;
+      }
+
+      // Determine the origin coordinate of the cell currently being edited
+      let editingCell = { r: 0, c: 0 };
+      const nameBox = container.querySelector<HTMLDivElement>('.fortune-name-box');
+      if (nameBox && nameBox.textContent) {
+        const parsed = parseCellAddress(nameBox.textContent);
+        if (parsed) {
+          editingCell = { r: parsed.row, c: parsed.col };
+        }
+      }
+
+      // Compute updated formula and range state
+      const result = computeNextFormulaReference(
+        currentText,
+        e.key as 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight',
+        e.shiftKey,
+        rangeNavigationStateRef.current,
+        editingCell
+      );
+
+      if (result) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        rangeNavigationStateRef.current = result.nextState;
+
+        // Synchronize updated formula to inputs
+        if (cellInput) {
+          cellInput.innerText = result.updatedFormula;
+          cellInput.textContent = result.updatedFormula;
+        }
+        if (fxInput) {
+          fxInput.innerText = result.updatedFormula;
+          fxInput.textContent = result.updatedFormula;
+        }
+
+        // Position caret at end of input
+        const sel = window.getSelection();
+        const range = document.createRange();
+        if (targetInput.childNodes.length > 0) {
+          const lastChild = targetInput.childNodes[targetInput.childNodes.length - 1];
+          const offset = lastChild.textContent?.length || 0;
+          range.setStart(lastChild, offset);
+          range.setEnd(lastChild, offset);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+
+        // Trigger input event to update FortuneSheet internal cache
+        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        // Visually select the referenced range on the grid
+        const rMin = Math.min(result.nextState.anchor.r, result.nextState.lead.r);
+        const rMax = Math.max(result.nextState.anchor.r, result.nextState.lead.r);
+        const cMin = Math.min(result.nextState.anchor.c, result.nextState.lead.c);
+        const cMax = Math.max(result.nextState.anchor.c, result.nextState.lead.c);
+
+        try {
+          workbookRef.current?.setSelection([{
+            row: [rMin, rMax],
+            column: [cMin, cMax]
+          }]);
+        } catch {
+          // In case canvas is not mounted
+        }
+      } else {
+        // Not in reference position; allow normal caret movement
+        rangeNavigationStateRef.current = null;
+      }
+    };
+
+    container.addEventListener('keydown', handleKeyDownCapture, { capture: true });
+    return () => {
+      container.removeEventListener('keydown', handleKeyDownCapture, { capture: true });
+    };
+  }, [isLoading]);
 
   // Handle Sheet Data Change from FortuneSheet
   const handleSheetChange = useCallback((newData: any[]) => {
@@ -487,7 +636,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
             </div>
           </div>
         ) : (
-          <div className="catchy-spreadsheet-host w-full h-full">
+          <div ref={hostContainerRef} className="catchy-spreadsheet-host w-full h-full">
             <Workbook
               ref={workbookRef}
               data={sheetData}
