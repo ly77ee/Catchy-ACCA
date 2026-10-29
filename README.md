@@ -1,205 +1,87 @@
-# Catchy ACCA · by ly77ee
+# Catchy ACCA
 
-> A clean, modern, beginner-friendly desktop study companion and exam progress manager for ACCA students worldwide. Built with React, TypeScript, Tailwind CSS, TipTap rich text, and local-first IndexedDB persistence.
+**A study companion for ACCA students.**
 
----
+Catchy ACCA is an open-source project aimed at making ACCA exam preparation more organised and accessible. It is being developed with a focus on helping students manage their studies through a clean, modern desktop experience.
 
-## 🖥️ Desktop Releases (Windows & macOS)
+This project is a work in progress and may or may not receive future updates. Features and functionality are subject to change as development continues. It was originally developed as a personal project to support and improve my ACCA studies.
 
-Catchy ACCA is packaged as a native, installable desktop application:
-- **macOS:** Distributable `.dmg` disk image with drag-and-drop installation to `/Applications`.
-- **Windows:** Conventional NSIS `.exe` installer with optional Start Menu and Desktop shortcuts.
-- **First-Launch Wizard:** 8-step setup wizard introduces local-first privacy, customises student profile, configures exam targets, and previews CBE workflows.
-- **Data Protection:** All study materials, notes, checklists, and question attempts reside permanently in `%APPDATA%\Catchy ACCA` (Windows) or `~/Library/Application Support/Catchy ACCA` (macOS). User data is never deleted during application updates or standard uninstallation.
+## Features
 
-For full release and installation guidance, see [Desktop Application Release Guide](docs/DESKTOP_RELEASE.md).
+Catchy ACCA is designed to bring useful study tools together in one place, with an emphasis on simplicity, usability, and helping students stay organised.
 
----
+As development progresses, this README will be updated to reflect the features that are implemented and working.
 
-## 📖 Product Objective
+## Desktop Application
 
-**Catchy ACCA** gives ACCA students a dedicated, private, and distraction-free workspace on their computer. Students can track their qualification progress, import their study materials, extract questions intelligently, practice in a faithful CBE exam simulator, write constructed responses, build spreadsheet financial workings, and prepare systematically for upcoming exam sessions.
+Catchy ACCA is intended to be available as a desktop application for Windows and macOS.
 
-All documents, questions, exam responses, written answers, and spreadsheets remain **100% on your device** in local browser storage (IndexedDB). No cloud account, third-party login, or paid AI subscription is required.
+Installation instructions and release downloads will be provided through the repository's [Releases](../../releases) page as builds become available.
 
----
+**Note:** Availability of a release does not necessarily mean every feature is complete. Check the release notes for the current version's status and known limitations.
 
-## 🎨 Visual Identity & Principles
+## Built With
 
-- **ACCA-Inspired Palette:** High-contrast professional black (`#141419`), charcoal slate (`#1e1e24`), crisp white, and ACCA signature red (`#c00000`).
-- **Circular Progress Indicators:** Circular rings showing overall qualification completion, individual paper progress, and exam simulation scores.
-- **Typographic Wordmark:** Distinctive **Catchy ACCA** typographic wordmark with creator credit **by ly77ee**.
-- **Real Engineering:** The Word-like and Excel-like workspaces are full functional tools with genuine formula calculations and rich-text editing, not decorative mockups.
+Catchy ACCA uses modern web development technologies, including:
 
----
+- **React** for building the user interface.
+- **TypeScript** for typed JavaScript development.
+- **Vite** for development and building.
+- **Tailwind CSS** for styling.
 
-## ✨ Features Overview
+Additional technologies may be used as development progresses.
 
-### Phase 1: Foundation
-- **Main Dashboard:** Live circular progress indicator calculating overall qualification completion (out of 13 exams), stage-wise progress, subject-wise paper grid, daily study checklist, next-exam countdown, and global search.
-- **ACCA Qualification Configuration:** Centralized and versioned qualification definitions (`current_2024_2026` and `redesigned_future`) guaranteeing permanent preservation of passes, exemptions, and notes across framework views.
-- **Local PDF Study Materials Library:** Fast in-browser canvas rendering with page navigation, zoom, and metadata.
-- **Question Manager:** Comprehensive logging with topic tags, doubt flags, confidence ratings, and direct jumping to PDF pages.
-- **Persistence & Backup:** Relational IndexedDB storage via Dexie.js with JSON export/import and pre-flight validation.
-
-### Phase 2: Question Intelligence & Exam Simulator
-- **Intelligent Question Extraction:** Extracts question numbers, titles, prompts, subquestions, marks, options, and answer keys from imported study PDFs with image-only scan detection.
-- **Verification & Review Screen:** Review, edit, approve, or adjust question data, options, marks, and answer keys before importing.
-- **Syllabus Topic Intelligence:** Recommends syllabus topic tags based on official standard taxonomies (IFRS 15, IFRS 16, IAS 36, Consolidation, ABC, Variances, etc.).
-- **CBE Exam Simulator:** Timed and untimed simulations with single/multi-select auto-marking, question navigator, flag-for-review, and detailed debrief screens.
-- **Attempt History:** Stores historical simulations and synchronizes results with dashboard metrics.
-
-### Phase 3: Answer Writer & Spreadsheet Workspace
-- **Integrated Answer Writer (`AnswerWriter`):**
-  - Powered by **TipTap** rich-text editor running 100% offline.
-  - Headings (H1, H2, H3), paragraphs, bold, italic, underline, bullet lists, numbered lists, and interactive tables.
-  - Undo and redo history with keyboard shortcuts (`Ctrl+Z`, `Ctrl+Y`, `Ctrl+B`, `Ctrl+I`, `Ctrl+U`).
-  - Automatic draft saving to IndexedDB with debounced change detection.
-  - Multiple attempt management: save and revisit multiple versions (`Attempt #1`, `Attempt #2`) for the same question.
-  - Word count, character count, and last-saved timestamp.
-  - Copy to clipboard and export in **Plain Text (.txt)**, **Markdown (.md)**, and **HTML (.html)**.
-- **Integrated Spreadsheet Workspace (`SpreadsheetWorkspace`):**
-  - Grid interface matching ACCA CBE spreadsheet specifications.
-  - Cell selection, keyboard navigation (`Arrow keys`, `Enter`, `Escape`), and formula input (`=fx`).
-  - **Deterministic Formula Engine:**
-    - Arithmetic: `+`, `-`, `*`, `/`, `^`, parentheses, unary minus.
-    - Cell references (`A1`, `B2`) and range expansion (`A1:A5`, `B2:D4`).
-    - Financial & Statistical Functions: `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`.
-    - `NPV(rate, cash_flows)`: Exact discounted cash flow calculation $\sum \frac{CF_t}{(1+r)^t}$.
-    - `IRR(range, [guess])`: Newton-Raphson approximation for Internal Rate of Return.
-    - `PMT(rate, nper, pv)`: Annuity/loan repayment calculation.
-    - `ROUND(number, [digits])`, `ABS(number)`, `IF(condition, if_true, [if_false])`.
-    - Error handling: `#DIV/0!`, `#NAME?`, `#VALUE!`, `#REF!`, `#CIRCULAR!`.
-  - Cell formatting: Currency (`$ / £`), Percent (`%`), Decimals, and Bold.
-  - Financial statement layout templates:
-    - *Statement of Financial Position (Balance Sheet)*
-    - *Investment Appraisal (NPV & Cash Flows Working)*
-  - Multi-sheet workbooks (add sheet, switch sheet).
-  - Undo and redo stack for sheet edits.
-  - CSV exchange: **Export CSV** and **Import CSV**.
-- **Connected Workspace (`ConnectedWorkspace`):**
-  - Access both the Answer Writer and Spreadsheet Workspace simultaneously from any question without losing context.
-  - **Split View:** Side-by-side view with Word Answer Writer on the left and Excel Workings Grid on the right.
-  - Both workspaces link directly to the selected ACCA paper and question.
-
-### Phase 4: AI Assistance, Answer Review & Final Quality
-- **Optional AI Provider Architecture:**
-  - Strictly optional layer. Core study tracking, question bank, PDF viewer, exam simulator, Answer Writer, and Excel Workings grid work 100% offline without any AI connection or external account.
-  - Supported providers:
-    - **Built-in Offline Engine:** 100% on-device educational tutor using comprehensive ACCA standards knowledge base and document citations. Zero network calls or API keys required.
-    - **Local Ollama:** Connect to a private local LLM instance (e.g. `http://localhost:11434`) without transmitting data to cloud services.
-    - **Cloud BYOK Providers:** Secure bring-your-own-key configuration for Google Gemini, OpenAI, and Anthropic.
-  - **Privacy Boundary & Consent:** API keys stored strictly in client-side localStorage. External transmission is blocked unless explicit user consent is affirmatively granted.
-- **ACCA Study Assistant (`AIAssistant`):**
-  - Answers technical queries across IFRS/IAS standards, audit methodologies (ISA), financial management (WACC, NPV), and management accounting.
-  - Grounds explanations in student-uploaded study PDFs with exact document and page number citations.
-  - Includes syllabus quick prompts and prominent educational guidance disclaimers.
-- **Written-Answer Review Engine (`answerReviewEngine`):**
-  - Directly accessible from the Answer Writer via the **Review Answer** modal.
-  - Evaluates student drafts against model solutions and marking schemes:
-    - **Technical Points Found vs Missing:** Highlights syllabus criteria identified in the student's text.
-    - **Accounting Checks:** Detects standard misconceptions (e.g., goodwill impairment reversal prohibition under IAS 36, off-balance leases under IFRS 16).
-    - **Deterministic Calculation Checking:** Cross-checks numerical values against expected workings and highlights discrepancies with explanations.
-    - **Alternative Valid Presentations:** Identifies permissible presentation variances (e.g., direct vs indirect cash flow method under IAS 7).
-    - **Unsupported Assertions:** Flags unhedged or unsubstantiated generalizations.
-- **Revision & Progress Analytics (`RevisionAnalytics`):**
-  - **Mistake & Doubt Journal:** Collects questions marked doubtful or where the student scored below 50% in CBE exam attempts. Allows 1-click doubt resolution and drafting.
-  - **Topic Mastery Matrix:** Calculates mastery percentage across syllabus topics, classifying them into *Mastered (≥75%)*, *Solid (50–74%)*, and *Needs Revision (<50% or active doubts)*.
-  - **Targeted Revision Exam Generator:** Creates a customized revision mock session focused exclusively on weak syllabus topics.
-  - **Exam Target Pacing:** Provides daily and weekly recommendations based on the student's planned exam session.
-
----
-
-## 📋 Supported Question & Workspace Formats
-
-| Format | Support Status | Evaluation Method | Implementation Details |
-| :--- | :---: | :--- | :--- |
-| **Section A Objective MCQ (Single-Select)** | **Full** | Automated Marking | Exact match against verified answer key (A, B, C, D). |
-| **Section A/B Multi-Select Objective** | **Full** | Automated (Partial Credit) | Proportional partial credit if partially correct with zero wrong choices. |
-| **Section C Constructed Response (Essay)** | **Full** | Self-Evaluation (Marking Scheme) | Word processor with headings, tables, word counter, and marking points comparison. |
-| **Financial Calculations & Workings** | **Full** | Deterministic Formula Grid | Formula calculations (NPV, IRR, SUM, etc.) with verified mathematical results. |
-| **Spreadsheet File Exchange** | **Full** | RFC 4180 CSV Import/Export | Export sheets to `.csv` or import external CSV spreadsheets into new sheets. |
-| **Constructed Response Export** | **Full** | TXT, MD, HTML | Export written responses in plain text, markdown, or clean styled HTML. |
-
----
-
-## 🚀 Beginner Quick-Start Guide
+## Getting Started
 
 ### Prerequisites
-Make sure you have **Node.js** (version 18 or newer) installed on your computer.
 
-### Step 1: Open Terminal in Project Directory
+- [Node.js](https://nodejs.org/) installed on your computer.
+- Git, if you want to clone the repository.
+
+### Installation
+
+Clone the repository:
+
 ```bash
-cd "/Users/pavan/My Files/PROJECT"
+git clone https://github.com/ly77ee/Catchy-ACCA.git
+cd Catchy-ACCA
 ```
 
-### Step 2: Install Dependencies
+Install the dependencies:
+
 ```bash
 npm install
 ```
 
-### Step 3: Launch the Development Server
+Start the development server:
+
 ```bash
 npm run dev
 ```
-Open your browser and navigate to:
-```
-http://localhost:5173
-```
+
+Open the local URL displayed in your terminal to access the application.
+
+These instructions assume the repository's current configuration supports the commands shown above.
+
+## Contributing
+
+Catchy ACCA is an open-source project, and contributions are welcome.
+
+You can contribute by reporting bugs, suggesting improvements, improving documentation, or submitting code changes.
+
+Before submitting a contribution, check the existing issues and repository guidelines.
+
+## License
+
+See the [LICENSE](LICENSE) file for the licensing terms of this project.
+
+## Disclaimer
+
+Catchy ACCA is an independent project and is not affiliated with, endorsed by, or officially associated with the Association of Chartered Certified Accountants (ACCA).
+
+ACCA is a registered trademark of the Association of Chartered Certified Accountants. All trademarks belong to their respective owners.
 
 ---
 
-## 🧪 Running Automated Tests
+**Catchy ACCA** · by [ly77ee](https://github.com/ly77ee)
 
-To run the Vitest test suite (64 automated unit and integration tests across 13 test suites):
-```bash
-npm test
-```
-
-To run a production build and type check:
-```bash
-npm run build
-```
-
----
-
-## 📄 Project License
-
-Catchy ACCA is free software released under the **GNU General Public License version 3.0 (GPL-3.0-only)**. You may redistribute and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation. See the [LICENSE](LICENSE) file for the full license text.
-
----
-
-## 📦 Official Releases & Bug Reports
-
-- **GitHub Repository:** [https://github.com/ly77ee/Catchy-ACCA](https://github.com/ly77ee/Catchy-ACCA)
-- **Official Releases:** Ready-to-use desktop installers (.dmg for macOS, .exe for Windows) can be downloaded directly from [Catchy ACCA Releases](https://github.com/ly77ee/Catchy-ACCA/releases).
-- **Issue Tracking & Feedback:** Found a bug or have a suggestion? Please file an issue on the [GitHub Issue Tracker](https://github.com/ly77ee/Catchy-ACCA/issues).
-
----
-
-## 📜 Dependency & License Inventory
-
-Catchy ACCA itself is licensed under **GPL-3.0-only**, and incorporates standard open-source dependencies:
-- **React 18** (MIT License) — UI library
-- **TypeScript** (Apache 2.0) — Type safety and developer experience
-- **Vite** (MIT License) — Build tool and dev server
-- **Electron** (MIT License) — Desktop application runtime
-- **TipTap Core & Extensions** (MIT License) — Rich-text editing engine
-- **Dexie.js** (Apache 2.0) — IndexedDB client library for local persistence
-- **PDF.js (`pdfjs-dist`)** (Apache 2.0) — Mozilla's PDF rendering engine
-- **Tailwind CSS** (MIT License) — Utility-first styling system
-- **Lucide React** (ISC License) — Icons
-- **Vitest & React Testing Library** (MIT License) — Automated test runner
-
----
-
-## ⚖️ Legal & Trademark Disclaimer
-
-**Catchy ACCA** is an independent open-source project and is **not** endorsed by, affiliated with, or associated with the Association of Chartered Certified Accountants (ACCA).
-
-- All ACCA paper names, qualifications, and exam structures are trademarks of ACCA.
-- Catchy ACCA does not distribute copyrighted question banks or study materials from ACCA, Kaplan, BPP, or any other publisher. Students import their own legally obtained study materials.
-
----
-
-*Catchy ACCA · by ly77ee*
