@@ -12,7 +12,8 @@ import {
   SpreadsheetWorkbook,
   ChecklistRecord,
   ChecklistItem,
-  AccaNewsItem
+  AccaNewsItem,
+  DocumentAnnotation
 } from '../types';
 
 export class CatchyAccaDatabase extends Dexie {
@@ -28,6 +29,7 @@ export class CatchyAccaDatabase extends Dexie {
   checklists!: Table<ChecklistRecord, string>;
   checklistItems!: Table<ChecklistItem, string>;
   newsCache!: Table<AccaNewsItem, string>;
+  annotations!: Table<DocumentAnnotation, string>;
 
   constructor() {
     super('CatchyAccaDB');
@@ -62,6 +64,11 @@ export class CatchyAccaDatabase extends Dexie {
       checklists: 'id, paperId, qualificationVersionId, updatedAt',
       checklistItems: 'id, checklistId, paperId, order, completed, level',
       newsCache: 'id, publishedAt, category, isOfficial'
+    });
+
+    // Version 6 adds document persistent annotations and highlights
+    this.version(6).stores({
+      annotations: 'id, materialId, pageNumber, createdAt'
     });
   }
 }
@@ -369,6 +376,7 @@ export async function createBackupPayload(versionId: string): Promise<BackupPayl
   const checklists = await db.checklists.toArray();
   const checklistItems = await db.checklistItems.toArray();
   const newsCache = await db.newsCache.toArray();
+  const annotations = await db.annotations.toArray();
 
   // Strip large binary blobs from JSON backup for safety & portability
   const sanitizedMaterials = studyMaterials.map(({ pdfData, ...rest }) => rest);
@@ -389,7 +397,8 @@ export async function createBackupPayload(versionId: string): Promise<BackupPayl
     spreadsheets,
     checklists,
     checklistItems,
-    newsCache
+    newsCache,
+    annotations
   };
 }
 
@@ -458,7 +467,8 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       db.spreadsheets,
       db.checklists,
       db.checklistItems,
-      db.newsCache
+      db.newsCache,
+      db.annotations
     ], async () => {
       await db.paperRecords.clear();
       await db.questions.clear();
@@ -471,6 +481,7 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       await db.checklists.clear();
       await db.checklistItems.clear();
       await db.newsCache.clear();
+      await db.annotations.clear();
 
       if (payload.paperRecords?.length) await db.paperRecords.bulkPut(payload.paperRecords);
       if (payload.questions?.length) await db.questions.bulkPut(payload.questions);
@@ -483,6 +494,7 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       if (payload.checklists?.length) await db.checklists.bulkPut(payload.checklists);
       if (payload.checklistItems?.length) await db.checklistItems.bulkPut(payload.checklistItems);
       if (payload.newsCache?.length) await db.newsCache.bulkPut(payload.newsCache);
+      if (payload.annotations?.length) await db.annotations.bulkPut(payload.annotations);
     });
   } else {
     // Merge mode: upsert records
@@ -496,6 +508,7 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
     if (payload.checklists?.length) await db.checklists.bulkPut(payload.checklists);
     if (payload.checklistItems?.length) await db.checklistItems.bulkPut(payload.checklistItems);
     if (payload.newsCache?.length) await db.newsCache.bulkPut(payload.newsCache);
+    if (payload.annotations?.length) await db.annotations.bulkPut(payload.annotations);
   }
 
   await logActivity(
@@ -503,4 +516,33 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
     `Successfully restored backup from ${payload.exportedAt} (${mode} mode).`,
     'backup'
   );
+}
+
+// ============================================================================
+// Document Annotations & Highlighting Helpers
+// ============================================================================
+
+export async function getAnnotationsForMaterial(materialId: string): Promise<DocumentAnnotation[]> {
+  try {
+    return await db.annotations.where('materialId').equals(materialId).toArray();
+  } catch (err) {
+    console.error('Failed to get annotations for material:', err);
+    return [];
+  }
+}
+
+export async function saveAnnotation(annotation: DocumentAnnotation): Promise<void> {
+  try {
+    await db.annotations.put(annotation);
+  } catch (err) {
+    console.error('Failed to save annotation:', err);
+  }
+}
+
+export async function deleteAnnotation(id: string): Promise<void> {
+  try {
+    await db.annotations.delete(id);
+  } catch (err) {
+    console.error('Failed to delete annotation:', err);
+  }
 }

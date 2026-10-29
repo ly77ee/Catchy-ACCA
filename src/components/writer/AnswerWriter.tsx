@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { Underline } from '@tiptap/extension-underline';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
@@ -9,7 +8,8 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import {
   WrittenAnswerDraft,
   QuestionRecord,
-  QualificationVersion
+  QualificationVersion,
+  AnswerReviewResult
 } from '../../types';
 import { db, logActivity } from '../../db';
 import {
@@ -24,20 +24,19 @@ import {
   Table as TableIcon,
   Undo2,
   Redo2,
-  Save,
   Copy,
-  Download,
-  History,
   Clock,
   Plus,
   Trash2,
   Check,
   FileText,
-  Sparkles
+  Sparkles,
+  Rows2,
+  Columns2,
+  ChevronDown
 } from 'lucide-react';
 import { AnswerReviewModal } from './AnswerReviewModal';
 import { evaluateWrittenAnswer } from '../../utils/answerReviewEngine';
-import { AnswerReviewResult } from '../../types';
 
 interface AnswerWriterProps {
   version: QualificationVersion;
@@ -46,6 +45,7 @@ interface AnswerWriterProps {
   initialPaperId?: string;
   onSelectQuestion?: (questionId: string) => void;
   onOpenSpreadsheet?: () => void;
+  isCompact?: boolean;
 }
 
 export const AnswerWriter: React.FC<AnswerWriterProps> = ({
@@ -55,6 +55,7 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
   initialPaperId = 'FR',
   onSelectQuestion,
   onOpenSpreadsheet,
+  isCompact = false,
 }) => {
   const [selectedPaperId, setSelectedPaperId] = useState<string>(initialPaperId);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string>(initialQuestionId || '');
@@ -65,16 +66,16 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewResult, setReviewResult] = useState<AnswerReviewResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showTableMenu, setShowTableMenu] = useState(false);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize TipTap Editor
+  // Initialize TipTap Editor with extensions
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
       }),
-      Underline,
       Table.configure({
         resizable: true,
       }),
@@ -82,13 +83,13 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
       TableHeader,
       TableCell,
     ],
-    content: '<p>Start typing your structured answer here...</p>',
+    content: '<p>Start typing your structured ACCA answer here...</p>',
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl focus:outline-none min-h-[400px] p-6 text-gray-900',
+        class: 'focus:outline-none min-h-[480px] p-6 text-gray-900 leading-relaxed font-sans',
       },
     },
-    onUpdate: ({ editor }) => {
+    onUpdate: () => {
       setSaveStatus('dirty');
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
@@ -97,23 +98,28 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
     },
   });
 
-  // Load answers from DB when selected question changes
+  // Load answers from DB when selected question or paper changes
   useEffect(() => {
+    let isCancelled = false;
     const loadDrafts = async () => {
       let query = db.writtenAnswers.where('paperId').equals(selectedPaperId);
       let drafts = await query.toArray();
 
       if (selectedQuestionId) {
-        drafts = drafts.filter(d => d.questionId === selectedQuestionId);
+        drafts = drafts.filter((d) => d.questionId === selectedQuestionId);
       }
 
       drafts.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
+      if (isCancelled) return;
+
       if (drafts.length > 0) {
         setAnswerAttempts(drafts);
         setActiveAttemptIndex(0);
-        if (editor && drafts[0].contentHtml) {
-          editor.commands.setContent(drafts[0].contentHtml);
+        if (editor && !editor.isDestroyed && drafts[0].contentHtml) {
+          try {
+            editor.commands.setContent(drafts[0].contentHtml);
+          } catch {}
         }
       } else {
         // Create initial blank attempt for this question/paper
@@ -122,25 +128,31 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
           questionId: selectedQuestionId || undefined,
           paperId: selectedPaperId,
           title: selectedQuestionId
-            ? `Answer: ${allQuestions.find(q => q.id === selectedQuestionId)?.title || 'Question'}`
-            : `${selectedPaperId} Theory & Case Study Response`,
+            ? `Answer: ${allQuestions.find((q) => q.id === selectedQuestionId)?.title || 'Question'}`
+            : `${selectedPaperId} CBE Word Response`,
           attemptNumber: 1,
-          contentHtml: '<p>Start typing your answer here...</p>',
+          contentHtml: '<p>Start typing your structured ACCA answer here...</p>',
           plainText: '',
           wordCount: 0,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         };
         setAnswerAttempts([blank]);
         setActiveAttemptIndex(0);
-        if (editor) {
-          editor.commands.setContent(blank.contentHtml);
+        if (editor && !editor.isDestroyed) {
+          try {
+            editor.commands.setContent(blank.contentHtml);
+          } catch {}
         }
       }
       setSaveStatus('saved');
     };
 
     loadDrafts();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [selectedPaperId, selectedQuestionId, editor]);
 
   const activeDraft = answerAttempts[activeAttemptIndex];
@@ -160,11 +172,11 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
       contentHtml: html,
       plainText: text,
       wordCount: words,
-      updatedAt: now
+      updatedAt: now,
     };
 
     await db.writtenAnswers.put(updated);
-    setAnswerAttempts(prev => {
+    setAnswerAttempts((prev) => {
       const copy = [...prev];
       copy[activeAttemptIndex] = updated;
       return copy;
@@ -188,7 +200,7 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
       plainText: '',
       wordCount: 0,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     await db.writtenAnswers.put(newDraft);
@@ -226,7 +238,7 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
     if (format === 'txt') {
       content = editor.getText();
     } else if (format === 'html') {
-      content = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${activeDraft.title}</title><style>body{font-family:sans-serif;max-width:800px;margin:2rem auto;line-height:1.6;color:#111;}</style></head><body>${editor.getHTML()}</body></html>`;
+      content = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${activeDraft.title}</title><style>body{font-family:sans-serif;max-width:800px;margin:2rem auto;line-height:1.6;color:#111;}.ProseMirror table{border-collapse:collapse;width:100%;margin:1rem 0;}.ProseMirror td,.ProseMirror th{border:1px solid #999;padding:6px 10px;}</style></head><body>${editor.getHTML()}</body></html>`;
       mime = 'text/html';
     } else if (format === 'md') {
       content = `# ${activeDraft.title}\n\n${editor.getText()}`;
@@ -242,10 +254,38 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // Insert standard ACCA response table
+  // Table manipulation commands
   const handleInsertTable = () => {
     if (!editor) return;
-    editor.commands.insertTable({ rows: 3, cols: 3, withHeaderRow: true });
+    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+  };
+
+  const handleAddRowBefore = () => {
+    editor?.chain().focus().addRowBefore().run();
+  };
+
+  const handleAddRowAfter = () => {
+    editor?.chain().focus().addRowAfter().run();
+  };
+
+  const handleDeleteRow = () => {
+    editor?.chain().focus().deleteRow().run();
+  };
+
+  const handleAddColumnBefore = () => {
+    editor?.chain().focus().addColumnBefore().run();
+  };
+
+  const handleAddColumnAfter = () => {
+    editor?.chain().focus().addColumnAfter().run();
+  };
+
+  const handleDeleteColumn = () => {
+    editor?.chain().focus().deleteColumn().run();
+  };
+
+  const handleDeleteTable = () => {
+    editor?.chain().focus().deleteTable().run();
   };
 
   const handleRunReview = () => {
@@ -270,341 +310,438 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
   const wordCount = editor ? (editor.getText().trim() ? editor.getText().trim().split(/\s+/).length : 0) : 0;
   const charCount = editor ? editor.getText().length : 0;
 
-  const paperQuestions = allQuestions.filter(q => q.paperId === selectedPaperId);
-  const selectedQuestion = allQuestions.find(q => q.id === selectedQuestionId);
+  const paperQuestions = allQuestions.filter((q) => q.paperId === selectedPaperId);
+  const selectedQuestion = allQuestions.find((q) => q.id === selectedQuestionId);
+  const isInsideTable = Boolean(editor?.isActive('table'));
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
-      {/* Top Header Card */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-acca-red bg-red-50 px-2.5 py-0.5 rounded-full">
-              Constructed Response Workspace
-            </span>
-            <span className="text-xs text-gray-400">ACCA CBE Word Processor</span>
+    <div className="flex flex-col h-full w-full bg-[#141419] rounded-2xl border border-[#2a2a34] overflow-hidden shadow-2xl relative">
+      {/* Top Controls Bar (Integrated sleek header, replacing oversized introductory card) */}
+      <div className="px-3.5 py-2.5 bg-[#1e1e24] border-b border-[#2a2a34] flex flex-wrap items-center justify-between gap-2.5 shrink-0 select-none text-xs">
+        {/* Left: Paper & Question Selectors, Attempts */}
+        <div className="flex items-center space-x-2 min-w-0 flex-wrap gap-y-1">
+          <div className="flex items-center space-x-1.5 px-2 py-1 rounded-lg bg-[#141419] border border-[#2a2a34] shrink-0">
+            <FileText className="w-3.5 h-3.5 text-acca-red" />
+            <span className="font-bold text-gray-200 text-xs">Word Editor</span>
           </div>
-          <h1 className="text-2xl font-extrabold text-gray-900 mt-1">
-            Answer Writer
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Draft, format, and review constructed responses. Supports headings, tables, undo/redo, automatic draft recovery, and version history.
-          </p>
-        </div>
 
-        {/* Paper & Question Selectors */}
-        <div className="flex flex-wrap items-center gap-3">
+          {/* Paper Selector */}
           <select
             value={selectedPaperId}
             onChange={(e) => {
               setSelectedPaperId(e.target.value);
               setSelectedQuestionId('');
             }}
-            className="text-xs font-bold border border-gray-300 rounded-xl px-3 py-2 bg-white text-gray-900 outline-none focus:border-acca-red"
+            className="px-2.5 py-1 bg-[#141419] border border-[#2a2a34] rounded-lg text-xs font-semibold text-gray-200 focus:outline-none focus:border-acca-red transition-colors"
           >
-            {version.papers.map(p => (
-              <option key={p.id} value={p.id}>{p.id} — {p.name}</option>
-            ))}
-          </select>
-
-          <select
-            value={selectedQuestionId}
-            onChange={(e) => setSelectedQuestionId(e.target.value)}
-            className="text-xs font-medium border border-gray-300 rounded-xl px-3 py-2 bg-white text-gray-700 outline-none focus:border-acca-red max-w-xs truncate"
-          >
-            <option value="">General Practice (No linked question)</option>
-            {paperQuestions.map(q => (
-              <option key={q.id} value={q.id}>
-                {q.questionNumber}: {q.title}
+            {version.papers.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.code} — {p.name}
               </option>
             ))}
           </select>
 
+          {/* Question Selector */}
+          {paperQuestions.length > 0 && (
+            <select
+              value={selectedQuestionId}
+              onChange={(e) => {
+                setSelectedQuestionId(e.target.value);
+                if (onSelectQuestion) onSelectQuestion(e.target.value);
+              }}
+              className="px-2.5 py-1 bg-[#141419] border border-[#2a2a34] rounded-lg text-xs font-semibold text-gray-200 focus:outline-none focus:border-acca-red transition-colors max-w-[200px] truncate"
+            >
+              <option value="">(General Response)</option>
+              {paperQuestions.map((q) => (
+                <option key={q.id} value={q.id}>
+                  Q: {q.title} ({q.availableMarks || 0} marks)
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Switch to Spreadsheet Link */}
           {onOpenSpreadsheet && (
             <button
+              type="button"
               onClick={onOpenSpreadsheet}
-              className="text-xs font-bold bg-neutral-900 hover:bg-black text-white px-3 py-2 rounded-xl transition-colors"
+              className="px-2 py-1 bg-[#141419] hover:bg-[#25252e] text-gray-300 rounded-lg text-xs font-medium border border-[#2a2a34] transition-colors hidden lg:inline-flex"
             >
-              Open Workings Grid
+              Open Excel Grid
             </button>
           )}
 
+          {/* Attempt Selector Tabs */}
+          <div className="flex items-center space-x-1 ml-1 bg-[#141419] px-1 py-0.5 rounded-lg border border-[#2a2a34]">
+            <span className="text-[10px] uppercase font-bold text-gray-500 px-1">Attempt:</span>
+            {answerAttempts.map((att, idx) => (
+              <button
+                key={att.id}
+                type="button"
+                onClick={() => handleSwitchAttempt(idx)}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                  idx === activeAttemptIndex
+                    ? 'bg-acca-red text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-[#25252e]'
+                }`}
+              >
+                #{att.attemptNumber || idx + 1}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={handleCreateNewAttempt}
+              className="p-0.5 text-gray-400 hover:text-acca-red transition-colors"
+              title="Start New Attempt"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Actions, Review, Save Status */}
+        <div className="flex items-center space-x-2 shrink-0">
+          {/* Save Status Badge */}
+          <span
+            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+              saveStatus === 'saving'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                : saveStatus === 'dirty'
+                ? 'bg-gray-700/50 text-gray-300 border border-gray-600/40'
+                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+            }`}
+          >
+            {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'dirty' ? 'Unsaved edits' : 'Saved locally'}
+          </span>
+
+          {/* Copy Button */}
           <button
+            type="button"
+            onClick={handleCopyAnswer}
+            className="p-1 bg-[#141419] hover:bg-[#25252e] border border-[#2a2a34] rounded text-gray-300 hover:text-white transition-colors"
+            title="Copy text to clipboard"
+          >
+            {copySuccess ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+
+          {/* Export Dropdown */}
+          <div className="flex items-center space-x-0.5 bg-[#141419] p-0.5 rounded border border-[#2a2a34]">
+            <button
+              type="button"
+              onClick={() => handleExportFile('txt')}
+              className="px-1.5 py-0.5 text-[10px] text-gray-300 hover:text-white hover:bg-[#25252e] rounded"
+              title="Export as Plain Text"
+            >
+              TXT
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExportFile('md')}
+              className="px-1.5 py-0.5 text-[10px] text-gray-300 hover:text-white hover:bg-[#25252e] rounded"
+              title="Export as Markdown"
+            >
+              MD
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExportFile('html')}
+              className="px-1.5 py-0.5 text-[10px] text-gray-300 hover:text-white hover:bg-[#25252e] rounded"
+              title="Export as HTML"
+            >
+              HTML
+            </button>
+          </div>
+
+          {/* Review Answer Button */}
+          <button
+            type="button"
             onClick={() => {
               setIsReviewModalOpen(true);
               if (!reviewResult) {
                 handleRunReview();
               }
             }}
-            className="text-xs font-bold bg-acca-50 dark:bg-acca-950/40 text-acca-700 dark:text-acca-300 hover:bg-acca-100 border border-acca-200 dark:border-acca-900 px-3 py-2 rounded-xl transition-colors flex items-center gap-1.5 shadow-2xs"
+            className="px-2.5 py-1 bg-acca-red hover:bg-acca-red-hover text-white rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 shadow-xs"
           >
-            <Sparkles className="w-3.5 h-3.5 text-acca-600" />
-            Review Answer
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Review</span>
           </button>
         </div>
       </div>
 
-      {/* Linked Question Context Banner (if any) */}
+      {/* Linked Question Context Ribbon (Compact) */}
       {selectedQuestion && (
-        <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4 text-xs space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-gray-900">
+        <div className="bg-[#181820] border-b border-[#282836] px-4 py-2 text-xs flex items-center justify-between gap-4 text-gray-300">
+          <div className="min-w-0">
+            <span className="font-bold text-white mr-2">
               {selectedQuestion.questionNumber}: {selectedQuestion.title}
             </span>
-            <span className="font-bold px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-700">
-              {selectedQuestion.availableMarks || 20} Marks
+            <span className="text-gray-400 truncate hidden md:inline">
+              {selectedQuestion.notes || selectedQuestion.title}
             </span>
           </div>
-          <p className="text-gray-600 line-clamp-2 leading-relaxed font-sans">
-            {selectedQuestion.notes || selectedQuestion.title}
-          </p>
+          <span className="shrink-0 px-2 py-0.5 rounded bg-[#141419] border border-[#2a2a34] font-bold text-gray-300 text-[11px]">
+            {selectedQuestion.availableMarks || 20} Marks
+          </span>
         </div>
       )}
 
-      {/* Main Word Processor Surface */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden flex flex-col min-h-[600px]">
-        {/* Editor Toolbar */}
-        <div className="bg-gray-50 border-b border-gray-200 p-2.5 flex flex-wrap items-center justify-between gap-2 select-none">
-          {/* Formatting Controls */}
-          <div className="flex flex-wrap items-center gap-1">
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().undo().run()}
-              disabled={!editor?.can().undo()}
-              className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 text-gray-700 transition-colors"
-              title="Undo (Ctrl+Z)"
-            >
-              <Undo2 className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().redo().run()}
-              disabled={!editor?.can().redo()}
-              className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 text-gray-700 transition-colors"
-              title="Redo (Ctrl+Y)"
-            >
-              <Redo2 className="w-4 h-4" />
-            </button>
+      {/* Formatting & Table Controls Toolbar */}
+      <div className="bg-[#1a1a22] border-b border-[#282836] px-3.5 py-1.5 flex flex-wrap items-center justify-between gap-2 select-none shrink-0 text-white text-xs">
+        {/* Formatting Buttons (with onMouseDown preventDefault to preserve text selection!) */}
+        <div className="flex flex-wrap items-center gap-1">
+          {/* Undo / Redo */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().undo().run()}
+            disabled={!editor?.can().undo()}
+            className="p-1 rounded bg-[#141419] hover:bg-[#25252e] border border-[#2a2a34] disabled:opacity-30 text-gray-300 transition-colors"
+            title="Undo (Ctrl+Z)"
+            aria-label="Undo"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().redo().run()}
+            disabled={!editor?.can().redo()}
+            className="p-1 rounded bg-[#141419] hover:bg-[#25252e] border border-[#2a2a34] disabled:opacity-30 text-gray-300 transition-colors"
+            title="Redo (Ctrl+Y)"
+            aria-label="Redo"
+          >
+            <Redo2 className="w-3.5 h-3.5" />
+          </button>
 
-            <span className="w-px h-5 bg-gray-300 mx-1" />
+          <span className="w-px h-4 bg-[#2a2a34] mx-1" />
 
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-              className={`p-1.5 rounded text-xs font-bold transition-colors ${
-                editor?.isActive('heading', { level: 1 })
-                  ? 'bg-neutral-900 text-white'
-                  : 'hover:bg-gray-200 text-gray-700'
-              }`}
-              title="Heading 1"
-            >
-              <Heading1 className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-              className={`p-1.5 rounded text-xs font-bold transition-colors ${
-                editor?.isActive('heading', { level: 2 })
-                  ? 'bg-neutral-900 text-white'
-                  : 'hover:bg-gray-200 text-gray-700'
-              }`}
-              title="Heading 2"
-            >
-              <Heading2 className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
-              className={`p-1.5 rounded text-xs font-bold transition-colors ${
-                editor?.isActive('heading', { level: 3 })
-                  ? 'bg-neutral-900 text-white'
-                  : 'hover:bg-gray-200 text-gray-700'
-              }`}
-              title="Heading 3"
-            >
-              <Heading3 className="w-4 h-4" />
-            </button>
+          {/* Headings */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+            className={`p-1 rounded border transition-colors ${
+              editor?.isActive('heading', { level: 1 })
+                ? 'bg-acca-red text-white border-acca-red'
+                : 'bg-[#141419] hover:bg-[#25252e] border-[#2a2a34] text-gray-300'
+            }`}
+            title="Heading 1"
+            aria-label="Heading 1"
+          >
+            <Heading1 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+            className={`p-1 rounded border transition-colors ${
+              editor?.isActive('heading', { level: 2 })
+                ? 'bg-acca-red text-white border-acca-red'
+                : 'bg-[#141419] hover:bg-[#25252e] border-[#2a2a34] text-gray-300'
+            }`}
+            title="Heading 2"
+            aria-label="Heading 2"
+          >
+            <Heading2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
+            className={`p-1 rounded border transition-colors ${
+              editor?.isActive('heading', { level: 3 })
+                ? 'bg-acca-red text-white border-acca-red'
+                : 'bg-[#141419] hover:bg-[#25252e] border-[#2a2a34] text-gray-300'
+            }`}
+            title="Heading 3"
+            aria-label="Heading 3"
+          >
+            <Heading3 className="w-3.5 h-3.5" />
+          </button>
 
-            <span className="w-px h-5 bg-gray-300 mx-1" />
+          <span className="w-px h-4 bg-[#2a2a34] mx-1" />
 
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleBold().run()}
-              className={`p-1.5 rounded transition-colors ${
-                editor?.isActive('bold')
-                  ? 'bg-neutral-900 text-white'
-                  : 'hover:bg-gray-200 text-gray-700'
-              }`}
-              title="Bold (Ctrl+B)"
-            >
-              <Bold className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleItalic().run()}
-              className={`p-1.5 rounded transition-colors ${
-                editor?.isActive('italic')
-                  ? 'bg-neutral-900 text-white'
-                  : 'hover:bg-gray-200 text-gray-700'
-              }`}
-              title="Italic (Ctrl+I)"
-            >
-              <Italic className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleUnderline().run()}
-              className={`p-1.5 rounded transition-colors ${
-                editor?.isActive('underline')
-                  ? 'bg-neutral-900 text-white'
-                  : 'hover:bg-gray-200 text-gray-700'
-              }`}
-              title="Underline (Ctrl+U)"
-            >
-              <UnderlineIcon className="w-4 h-4" />
-            </button>
+          {/* Bold, Italic, Underline */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().toggleBold().run()}
+            className={`p-1 rounded border transition-colors ${
+              editor?.isActive('bold')
+                ? 'bg-acca-red text-white border-acca-red'
+                : 'bg-[#141419] hover:bg-[#25252e] border-[#2a2a34] text-gray-300'
+            }`}
+            title="Bold (Ctrl+B)"
+            aria-label="Bold"
+          >
+            <Bold className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().toggleItalic().run()}
+            className={`p-1 rounded border transition-colors ${
+              editor?.isActive('italic')
+                ? 'bg-acca-red text-white border-acca-red'
+                : 'bg-[#141419] hover:bg-[#25252e] border-[#2a2a34] text-gray-300'
+            }`}
+            title="Italic (Ctrl+I)"
+            aria-label="Italic"
+          >
+            <Italic className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().toggleUnderline().run()}
+            className={`p-1 rounded border transition-colors ${
+              editor?.isActive('underline')
+                ? 'bg-acca-red text-white border-acca-red'
+                : 'bg-[#141419] hover:bg-[#25252e] border-[#2a2a34] text-gray-300'
+            }`}
+            title="Underline (Ctrl+U)"
+            aria-label="Underline"
+          >
+            <UnderlineIcon className="w-3.5 h-3.5" />
+          </button>
 
-            <span className="w-px h-5 bg-gray-300 mx-1" />
+          <span className="w-px h-4 bg-[#2a2a34] mx-1" />
 
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleBulletList().run()}
-              className={`p-1.5 rounded transition-colors ${
-                editor?.isActive('bulletList')
-                  ? 'bg-neutral-900 text-white'
-                  : 'hover:bg-gray-200 text-gray-700'
-              }`}
-              title="Bullet List"
-            >
-              <List className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-              className={`p-1.5 rounded transition-colors ${
-                editor?.isActive('orderedList')
-                  ? 'bg-neutral-900 text-white'
-                  : 'hover:bg-gray-200 text-gray-700'
-              }`}
-              title="Numbered List"
-            >
-              <ListOrdered className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleInsertTable}
-              className="p-1.5 rounded hover:bg-gray-200 text-gray-700 transition-colors"
-              title="Insert Table (3x3)"
-            >
-              <TableIcon className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Lists */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().toggleBulletList().run()}
+            className={`p-1 rounded border transition-colors ${
+              editor?.isActive('bulletList')
+                ? 'bg-acca-red text-white border-acca-red'
+                : 'bg-[#141419] hover:bg-[#25252e] border-[#2a2a34] text-gray-300'
+            }`}
+            title="Bullet List"
+            aria-label="Bullet List"
+          >
+            <List className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+            className={`p-1 rounded border transition-colors ${
+              editor?.isActive('orderedList')
+                ? 'bg-acca-red text-white border-acca-red'
+                : 'bg-[#141419] hover:bg-[#25252e] border-[#2a2a34] text-gray-300'
+            }`}
+            title="Numbered List"
+            aria-label="Numbered List"
+          >
+            <ListOrdered className="w-3.5 h-3.5" />
+          </button>
 
-          {/* Right Status & Actions */}
-          <div className="flex items-center space-x-3 text-xs">
-            {/* Save Status Indicator */}
-            <span
-              className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                saveStatus === 'saving'
-                  ? 'bg-amber-100 text-amber-800'
-                  : saveStatus === 'dirty'
-                  ? 'bg-gray-200 text-gray-700'
-                  : 'bg-emerald-100 text-emerald-800'
-              }`}
-            >
-              {saveStatus === 'saving' ? 'Saving draft...' : saveStatus === 'dirty' ? 'Unsaved edits' : 'Saved locally'}
-            </span>
+          <span className="w-px h-4 bg-[#2a2a34] mx-1" />
 
-            <button
-              type="button"
-              onClick={handleCopyAnswer}
-              className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded flex items-center space-x-1"
-              title="Copy to clipboard"
-            >
-              {copySuccess ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-              <span className="hidden sm:inline">{copySuccess ? 'Copied!' : 'Copy'}</span>
-            </button>
+          {/* Table Insertion & Management Controls */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleInsertTable}
+            className={`p-1 rounded border transition-colors ${
+              editor?.isActive('table')
+                ? 'bg-acca-red text-white border-acca-red'
+                : 'bg-[#141419] hover:bg-[#25252e] border-[#2a2a34] text-gray-300'
+            }`}
+            title="Insert Table (3x3)"
+            aria-label="Insert Table"
+          >
+            <TableIcon className="w-3.5 h-3.5" />
+          </button>
 
-            {/* Export Dropdown */}
-            <div className="flex items-center space-x-1">
+          {/* Contextual Table Editing Controls (Visible when cursor inside a table) */}
+          {isInsideTable && (
+            <div className="flex items-center space-x-1 ml-1 bg-[#141419] p-0.5 rounded border border-[#2a2a34]">
+              <span className="text-[10px] font-bold text-acca-red px-1 uppercase tracking-wider">
+                Table:
+              </span>
               <button
                 type="button"
-                onClick={() => handleExportFile('txt')}
-                className="px-2 py-1 bg-white border border-gray-300 hover:bg-gray-50 rounded text-gray-700 font-medium text-[11px]"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleAddRowAfter}
+                className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e1e24] hover:bg-[#2a2a36] text-gray-200 border border-[#2a2a34] transition-colors"
+                title="Add Row Below"
               >
-                TXT
+                + Row
               </button>
               <button
                 type="button"
-                onClick={() => handleExportFile('md')}
-                className="px-2 py-1 bg-white border border-gray-300 hover:bg-gray-50 rounded text-gray-700 font-medium text-[11px]"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleDeleteRow}
+                className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e1e24] hover:bg-rose-950 text-gray-200 hover:text-rose-300 border border-[#2a2a34] transition-colors"
+                title="Delete Row"
               >
-                MD
+                - Row
               </button>
               <button
                 type="button"
-                onClick={() => handleExportFile('html')}
-                className="px-2 py-1 bg-white border border-gray-300 hover:bg-gray-50 rounded text-gray-700 font-medium text-[11px]"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleAddColumnAfter}
+                className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e1e24] hover:bg-[#2a2a36] text-gray-200 border border-[#2a2a34] transition-colors"
+                title="Add Column Right"
               >
-                HTML
+                + Col
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleDeleteColumn}
+                className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e1e24] hover:bg-rose-950 text-gray-200 hover:text-rose-300 border border-[#2a2a34] transition-colors"
+                title="Delete Column"
+              >
+                - Col
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleDeleteTable}
+                className="p-1 rounded text-[10px] bg-[#1e1e24] hover:bg-rose-950 text-gray-300 hover:text-rose-300 border border-[#2a2a34] transition-colors"
+                title="Delete Entire Table"
+              >
+                <Trash2 className="w-3 h-3 text-rose-400" />
               </button>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Editable Content Canvas */}
-        <div className="flex-1 bg-white overflow-y-auto cursor-text">
-          <EditorContent editor={editor} />
-        </div>
-
-        {/* Footer Meta & Version Attempts Bar */}
-        <div className="bg-gray-50 border-t border-gray-200 p-3 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
-          <div className="flex items-center space-x-4">
-            <span><strong>{wordCount}</strong> Words</span>
-            <span>•</span>
-            <span><strong>{charCount}</strong> Characters</span>
-            <span>•</span>
-            <span className="flex items-center space-x-1">
-              <Clock className="w-3.5 h-3.5 text-gray-400" />
-              <span>Last saved: {new Date(activeDraft?.updatedAt || Date.now()).toLocaleTimeString()}</span>
-            </span>
-          </div>
-
-          {/* Multiple Attempt Tabs */}
-          <div className="flex items-center space-x-1.5">
-            <span className="text-[11px] font-bold uppercase text-gray-400 mr-1 flex items-center space-x-1">
-              <History className="w-3 h-3" />
-              <span>Attempts:</span>
-            </span>
-
-            {answerAttempts.map((att, idx) => (
-              <button
-                key={att.id}
-                type="button"
-                onClick={() => handleSwitchAttempt(idx)}
-                className={`px-2 py-1 rounded text-[11px] font-bold transition-all ${
-                  idx === activeAttemptIndex
-                    ? 'bg-acca-red text-white'
-                    : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                #{att.attemptNumber || idx + 1}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              onClick={handleCreateNewAttempt}
-              className="p-1 text-gray-500 hover:text-acca-red hover:bg-white rounded border border-dashed border-gray-300 transition-colors"
-              title="Start a new answer attempt"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
+        {/* Word & Character Counter Indicator */}
+        <div className="flex items-center space-x-3 text-[11px] text-gray-400 font-mono">
+          <span>
+            <strong className="text-gray-200">{wordCount}</strong> words
+          </span>
+          <span>•</span>
+          <span>
+            <strong className="text-gray-200">{charCount}</strong> chars
+          </span>
         </div>
       </div>
 
-      {/* Answer Review & Model Comparison Modal */}
+      {/* Main Full-Height Document Canvas */}
+      <div className="flex-1 overflow-y-auto bg-[#101015] p-3 sm:p-6 flex justify-center cursor-text">
+        <div className="w-full max-w-4xl bg-white text-gray-900 rounded-lg shadow-2xl border border-gray-300 min-h-full p-6 sm:p-10 flex flex-col">
+          <EditorContent editor={editor} className="flex-1" />
+        </div>
+      </div>
+
+      {/* Subtle Footer Bar */}
+      <div className="bg-[#181820] border-t border-[#282836] px-4 py-1.5 flex items-center justify-between text-[11px] text-gray-400 shrink-0">
+        <div className="flex items-center space-x-2">
+          <Clock className="w-3 h-3 text-gray-500" />
+          <span>Last saved: {new Date(activeDraft?.updatedAt || Date.now()).toLocaleTimeString()}</span>
+        </div>
+        <span className="font-sans text-gray-500 text-[10px]">
+          ACCA Official CBE Format • Continuous Auto-Save
+        </span>
+      </div>
+
+      {/* Answer Review & Rubric Comparison Modal */}
       <AnswerReviewModal
         isOpen={isReviewModalOpen}
         onClose={() => setIsReviewModalOpen(false)}

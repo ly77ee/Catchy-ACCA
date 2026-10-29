@@ -131,3 +131,112 @@
   font-size: 11px !important;
 }
 
+/* ==========================================================================
+   ACCA CBE Word Editor / Tiptap Table & Formatting Styles
+   ========================================================================== */
+.ProseMirror {
+  min-height: 480px;
+  outline: none;
+}
+
+.ProseMirror p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+
+.ProseMirror h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: #111827;
+}
+
+.ProseMirror h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: #1f2937;
+}
+
+.ProseMirror h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+  color: #374151;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 1.25rem 0;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+}
+
+.ProseMirror td,
+.ProseMirror th {
+  min-width: 2em;
+  border: 1px solid #cbd5e1;
+  padding: 8px 12px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+  font-size: 0.875rem;
+}
+
+.ProseMirror th {
+  font-weight: 700;
+  text-align: left;
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.ProseMirror .selectedCell:after {
+  z-index: 2;
+  position: absolute;
+  content: "";
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(220, 38, 38, 0.1);
+  pointer-events: none;
+}
+
+.ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: #ef4444;
+  pointer-events: none;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+/* PDF text layer alignment adjustments */
+.textLayer {
+  opacity: 1 !important;
+}
+.textLayer ::selection {
+  background: rgba(239, 68, 68, 0.3) !important;
+}
+
+

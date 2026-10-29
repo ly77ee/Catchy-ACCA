@@ -348,6 +348,25 @@ export interface ChecklistItem {
   updatedAt: string;
 }
 
+export interface HighlightRect {
+  left: number; // % relative to page viewport width (0 - 100)
+  top: number; // % relative to page viewport height (0 - 100)
+  width: number; // % relative to page viewport width (0 - 100)
+  height: number; // % relative to page viewport height (0 - 100)
+}
+
+export type HighlightColor = 'yellow' | 'green' | 'pink' | 'blue';
+
+export interface DocumentAnnotation {
+  id: string;
+  materialId: string;
+  pageNumber: number;
+  text: string;
+  color: HighlightColor;
+  rects: HighlightRect[];
+  createdAt: string;
+}
+
 export interface ChecklistRecord {
   id: string;
   title: string;
@@ -390,6 +409,7 @@ export interface BackupPayload {
   checklists?: ChecklistRecord[];
   checklistItems?: ChecklistItem[];
   newsCache?: AccaNewsItem[];
+  annotations?: DocumentAnnotation[];
   aiConfig?: AIProviderConfig;
   answerReviews?: AnswerReviewResult[];
 }
