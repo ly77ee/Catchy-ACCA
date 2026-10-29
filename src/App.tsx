@@ -31,6 +31,7 @@ import { ExamPlanner } from './components/planner/ExamPlanner';
 import { TopicGrouping } from './components/topics/TopicGrouping';
 import { CatchyNotes } from './components/notes/CatchyNotes';
 import { AccaNews } from './components/news/AccaNews';
+import { FirstLaunchWizard } from './components/onboarding/FirstLaunchWizard';
 
 // Icons for Future Modules
 import { FileCheck, Table2, PenTool, TrendingUp, Bot } from 'lucide-react';
@@ -39,6 +40,9 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [versionId, setVersionId] = useState<string>('current_2024_2026');
   const [isDbReady, setIsDbReady] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    return localStorage.getItem('catchy_onboarding_completed') !== 'true';
+  });
 
   // Cross-component navigation state (e.g. from question click -> open PDF at specific page)
   const [activePdfMaterialId, setActivePdfMaterialId] = useState<string | null>(null);
@@ -322,12 +326,25 @@ export const App: React.FC = () => {
           onRefreshData={() => {
             // Live queries update automatically
           }}
+          onRestartOnboarding={() => setShowOnboarding(true)}
         />
       )}
 
       {/* Tab: Help */}
       {activeTab === 'help' && (
         <Help onNavigate={setActiveTab} />
+      )}
+
+      {/* First-Launch Onboarding Wizard */}
+      {showOnboarding && (
+        <FirstLaunchWizard
+          version={activeVersion}
+          onFinish={() => setShowOnboarding(false)}
+          onOpenStudyMaterials={() => {
+            setShowOnboarding(false);
+            setActiveTab('study-materials');
+          }}
+        />
       )}
     </AppLayout>
   );

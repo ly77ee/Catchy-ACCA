@@ -1,6 +1,8 @@
 node_modules
 dist
 dist-ssr
+dist_electron
+build/icon.iconset
 *.local
 .tools
 .DS_Store

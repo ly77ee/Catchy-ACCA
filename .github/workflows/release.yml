@@ -1,0 +1,136 @@
+name: Catchy ACCA Desktop Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            target: macOS DMG & Zip
+          - os: windows-latest
+            platform: win
+            target: Windows NSIS Installer (.exe)
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Check out Catchy ACCA source code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run automated test suites
+        run: npm test
+
+      - name: Generate Application Icons
+        run: node scripts/generate-icon.cjs
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Build Desktop Package (macOS)
+        if: matrix.platform == 'mac'
+        run: npx electron-builder --mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Desktop Package (Windows)
+        if: matrix.platform == 'win'
+        run: npx electron-builder --win nsis --x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute Checksums (macOS)
+        if: matrix.platform == 'mac'
+        run: |
+          cd dist_electron
+          shasum -a 256 *.dmg *.zip > checksums-mac.txt
+          cat checksums-mac.txt
+
+      - name: Compute Checksums (Windows)
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: |
+          cd dist_electron
+          Get-FileHash *.exe -Algorithm SHA256 | Out-File -FilePath checksums-win.txt
+          Get-Content checksums-win.txt
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: catchy-acca-${{ matrix.platform }}-release
+          path: |
+            dist_electron/*.dmg
+            dist_electron/*.zip
+            dist_electron/*.exe
+            dist_electron/checksums-*.txt
+
+  publish-github-release:
+    needs: build-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Flatten release assets
+        run: |
+          mkdir -p dist_release
+          find release-artifacts -type f -exec cp {} dist_release/ \;
+          ls -la dist_release/
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist_release/*
+          name: Catchy ACCA ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          body: |
+            ## Catchy ACCA · by ly77ee
+            ### Version ${{ github.ref_name }} Desktop Release
+
+            Official open-source, local-first desktop release for Windows and macOS.
+
+            #### Downloads
+            - **macOS Installer:** `Catchy ACCA-${{ github.ref_name }}.dmg` (Drag-and-drop to Applications)
+            - **Windows Installer:** `Catchy ACCA-Setup-${{ github.ref_name }}.exe` (NSIS Installer)
+
+            #### Release Highlights
+            - **100% Local-First Architecture:** No account, no cloud database, no subscription. All notes, checklists, progress, and study materials stay on your machine.
+            - **First-Launch Setup Wizard:** 8-step onboarding to personalize your stage, target paper, and intended exam sitting.
+            - **Full CBE Study Workspaces:**
+              - Excel Workspace with keyboard formula navigation and extended grid.
+              - Word Editor with live non-freezing word/char counters.
+              - PDF Study Materials with split-screen side-by-side mode.
+              - Syllabus Chapter Mastery Progress tracker.
+              - Verified ACCA Deadlines & News with timezone countdowns.
+
+            #### Verification
+            Compare file SHA-256 hashes against `checksums-mac.txt` and `checksums-win.txt`.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

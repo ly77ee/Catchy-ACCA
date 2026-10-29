@@ -31,11 +31,13 @@ import { AIProviderConfig, AIProviderType } from '../../types';
 interface SettingsProps {
   currentVersionId: string;
   onRefreshData: () => void;
+  onRestartOnboarding?: () => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({
   currentVersionId,
   onRefreshData,
+  onRestartOnboarding,
 }) => {
   const [backupSuccessMessage, setBackupSuccessMessage] = useState<string | null>(null);
 
@@ -442,6 +444,47 @@ export const Settings: React.FC<SettingsProps> = ({
               Save AI Configuration
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Setup Wizard Re-run */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-5 h-5 text-acca-red" />
+            <h2 className="text-base font-bold text-gray-900">
+              Workspace Onboarding & Setup Wizard
+            </h2>
+          </div>
+          <span className="text-xs font-semibold text-gray-500">
+            Setup Assistance
+          </span>
+        </div>
+
+        <p className="text-xs text-gray-600 leading-relaxed">
+          Revisit the 8-step onboarding wizard to adjust your display name, current qualification stage, target paper, or intended exam sitting.
+        </p>
+
+        <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/70 rounded-xl text-xs text-emerald-800 flex items-center space-x-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>
+            <strong>Safe execution guarantee:</strong> Re-running setup will <em>never</em> overwrite, reset, or delete your existing study notes, study materials, checklists, or answers.
+          </span>
+        </div>
+
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              if (onRestartOnboarding) {
+                onRestartOnboarding();
+              }
+            }}
+            className="px-4 py-2 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-colors inline-flex items-center space-x-2"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-acca-red" />
+            <span>Restart Setup Wizard</span>
+          </button>
         </div>
       </div>
 

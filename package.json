@@ -2,12 +2,78 @@
   "name": "catchy-acca",
   "private": true,
   "version": "1.0.0",
+  "description": "Catchy ACCA · Open-source local-first ACCA study workspace",
+  "author": "ly77ee",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "electron:dev": "electron .",
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:win": "npm run build && electron-builder --win",
+    "package:mac": "npm run build && electron-builder --mac dmg",
+    "package:win": "npm run build && electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "com.ly77ee.catchyacca",
+    "productName": "Catchy ACCA",
+    "copyright": "Copyright © 2026 ly77ee",
+    "directories": {
+      "output": "dist_electron",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.education",
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "title": "Catchy ACCA",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Catchy ACCA",
+      "uninstallDisplayName": "Catchy ACCA",
+      "deleteAppDataOnUninstall": false
+    }
   },
   "dependencies": {
     "@fortune-sheet/react": "^1.0.4",
@@ -35,6 +101,8 @@
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0",
     "fake-indexeddb": "^6.2.6",
     "jsdom": "^26.0.0",
     "postcss": "^8.5.2",

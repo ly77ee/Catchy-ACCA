@@ -4,6 +4,18 @@
 
 ---
 
+## 🖥️ Desktop Releases (Windows & macOS)
+
+Catchy ACCA is packaged as a native, installable desktop application:
+- **macOS:** Distributable `.dmg` disk image with drag-and-drop installation to `/Applications`.
+- **Windows:** Conventional NSIS `.exe` installer with optional Start Menu and Desktop shortcuts.
+- **First-Launch Wizard:** 8-step setup wizard introduces local-first privacy, customises student profile, configures exam targets, and previews CBE workflows.
+- **Data Protection:** All study materials, notes, checklists, and question attempts reside permanently in `%APPDATA%\Catchy ACCA` (Windows) or `~/Library/Application Support/Catchy ACCA` (macOS). User data is never deleted during application updates or standard uninstallation.
+
+For full release and installation guidance, see [Desktop Application Release Guide](docs/DESKTOP_RELEASE.md).
+
+---
+
 ## 📖 Product Objective
 
 **Catchy ACCA** gives ACCA students a dedicated, private, and distraction-free workspace on their computer. Students can track their qualification progress, import their study materials, extract questions intelligently, practice in a faithful CBE exam simulator, write constructed responses, build spreadsheet financial workings, and prepare systematically for upcoming exam sessions.
