@@ -9,7 +9,13 @@ import {
   RefreshCw,
   FileJson,
   Info,
-  Heart
+  Heart,
+  Bot,
+  Key,
+  Globe,
+  Eye,
+  EyeOff,
+  Sparkles
 } from 'lucide-react';
 import {
   createBackupPayload,
@@ -18,6 +24,8 @@ import {
   RestoreValidationResult
 } from '../../db';
 import { Modal } from '../common/Modal';
+import { getAIConfig, saveAIConfig, clearAIConfig, testAIConnection } from '../../utils/aiClient';
+import { AIProviderConfig, AIProviderType } from '../../types';
 
 interface SettingsProps {
   currentVersionId: string;
@@ -29,6 +37,12 @@ export const Settings: React.FC<SettingsProps> = ({
   onRefreshData,
 }) => {
   const [backupSuccessMessage, setBackupSuccessMessage] = useState<string | null>(null);
+
+  // AI Configuration states
+  const [aiConfig, setAiConfig] = useState<AIProviderConfig>(getAIConfig());
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [aiStatusMessage, setAiStatusMessage] = useState<{ success: boolean; text: string } | null>(null);
+  const [isTestingAi, setIsTestingAi] = useState(false);
 
   // Restore states
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
@@ -216,6 +230,192 @@ export const Settings: React.FC<SettingsProps> = ({
             >
               <FileJson className="w-4 h-4 text-acca-red" />
               <span>Select Backup File (.json)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* AI Assistance & Provider Architecture Card */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs space-y-5">
+        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+          <div className="flex items-center space-x-2">
+            <Bot className="w-5 h-5 text-acca-red" />
+            <div>
+              <h2 className="text-base font-bold text-gray-900">
+                AI Assistance & Provider Configuration (Strictly Optional)
+              </h2>
+              <p className="text-xs text-gray-500">
+                Core ACCA tracking, question bank, CBE exams, and workings grids remain 100% offline without any AI connection.
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+            {aiConfig.provider === 'offline_local' ? 'Offline-First Active' : 'External Config'}
+          </span>
+        </div>
+
+        {/* Status Message */}
+        {aiStatusMessage && (
+          <div
+            className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+              aiStatusMessage.success
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-red-50 border-red-200 text-red-800'
+            }`}
+          >
+            {aiStatusMessage.success ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+            )}
+            <span>{aiStatusMessage.text}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Provider Selection */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-gray-700">AI Provider Layer</label>
+            <select
+              value={aiConfig.provider}
+              onChange={(e) => {
+                const prov = e.target.value as AIProviderType;
+                let defaultModel = 'Built-in Educational Assistant';
+                if (prov === 'ollama') defaultModel = 'llama3.2';
+                else if (prov === 'openai') defaultModel = 'gpt-4o-mini';
+                else if (prov === 'gemini') defaultModel = 'gemini-1.5-flash';
+                else if (prov === 'anthropic') defaultModel = 'claude-3-5-sonnet-20241022';
+
+                setAiConfig((prev) => ({
+                  ...prev,
+                  provider: prov,
+                  modelName: defaultModel,
+                }));
+              }}
+              className="w-full text-xs font-medium border border-gray-300 rounded-xl px-3 py-2.5 bg-white text-gray-800 outline-none focus:border-acca-red"
+            >
+              <option value="offline_local">Built-in Offline Engine (Private, Zero Network, No Key)</option>
+              <option value="ollama">Local Ollama (Local Network, Private, http://localhost:11434)</option>
+              <option value="openai">OpenAI (Bring Your Own Key - gpt-4o-mini / gpt-4o)</option>
+              <option value="gemini">Google Gemini (Bring Your Own Key - gemini-1.5-flash)</option>
+              <option value="anthropic">Anthropic Claude (Bring Your Own Key - claude-3-5-sonnet)</option>
+            </select>
+          </div>
+
+          {/* Model Name */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-gray-700">Target Model Identifier</label>
+            <input
+              type="text"
+              value={aiConfig.modelName}
+              onChange={(e) => setAiConfig((prev) => ({ ...prev, modelName: e.target.value }))}
+              placeholder="e.g. gpt-4o-mini or llama3.2"
+              disabled={aiConfig.provider === 'offline_local'}
+              className="w-full text-xs border border-gray-300 rounded-xl px-3 py-2.5 bg-white disabled:bg-gray-100 text-gray-800 outline-none focus:border-acca-red"
+            />
+          </div>
+
+          {/* Ollama Endpoint (if ollama) */}
+          {aiConfig.provider === 'ollama' && (
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="text-xs font-bold text-gray-700">Ollama Host URL</label>
+              <input
+                type="text"
+                value={aiConfig.endpointUrl || 'http://localhost:11434'}
+                onChange={(e) => setAiConfig((prev) => ({ ...prev, endpointUrl: e.target.value }))}
+                placeholder="http://localhost:11434"
+                className="w-full text-xs border border-gray-300 rounded-xl px-3 py-2.5 bg-white text-gray-800 outline-none focus:border-acca-red font-mono"
+              />
+            </div>
+          )}
+
+          {/* API Key (if cloud provider) */}
+          {aiConfig.provider !== 'offline_local' && aiConfig.provider !== 'ollama' && (
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="text-xs font-bold text-gray-700">Provider API Key (BYOK)</label>
+              <div className="relative">
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  value={aiConfig.apiKey || ''}
+                  onChange={(e) => setAiConfig((prev) => ({ ...prev, apiKey: e.target.value }))}
+                  placeholder="Paste your private API key here..."
+                  className="w-full text-xs border border-gray-300 rounded-xl pl-3 pr-10 py-2.5 bg-white text-gray-800 outline-none focus:border-acca-red font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                >
+                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-500">
+                Your key is stored strictly on your computer (in browser localStorage) and is never transmitted to Catchy ACCA servers.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* User Consent Checkbox (Enforced by safety boundary) */}
+        {aiConfig.provider !== 'offline_local' && (
+          <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-2">
+            <label className="flex items-start gap-2.5 cursor-pointer text-xs text-amber-900 select-none">
+              <input
+                type="checkbox"
+                checked={aiConfig.hasUserConsent}
+                onChange={(e) =>
+                  setAiConfig((prev) => ({ ...prev, hasUserConsent: e.target.checked }))
+                }
+                className="mt-0.5 rounded border-amber-300 text-acca-red focus:ring-acca-red"
+              />
+              <span className="leading-relaxed">
+                <strong>Explicit External Transmission Consent:</strong> I understand that selecting a remote provider ({aiConfig.provider}) will transmit my question queries over the internet to that external provider. My local study PDFs and offline database remain strictly on my computer.
+              </span>
+            </label>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              clearAIConfig();
+              setAiConfig(getAIConfig());
+              setAiStatusMessage({ success: true, text: 'Reset to Built-in Offline Engine.' });
+              setTimeout(() => setAiStatusMessage(null), 3000);
+            }}
+            className="text-xs text-gray-500 hover:text-gray-800 underline"
+          >
+            Reset to Built-in Offline Engine
+          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={isTestingAi}
+              onClick={async () => {
+                setIsTestingAi(true);
+                setAiStatusMessage(null);
+                const res = await testAIConnection(aiConfig);
+                setAiStatusMessage({ success: res.success, text: res.message });
+                setIsTestingAi(false);
+              }}
+              className="px-3.5 py-2 border border-gray-300 hover:bg-gray-50 rounded-xl text-xs font-semibold text-gray-700 transition-colors"
+            >
+              {isTestingAi ? 'Testing Connection...' : 'Test Connection'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                saveAIConfig(aiConfig);
+                setAiStatusMessage({ success: true, text: 'AI configuration saved successfully!' });
+                setTimeout(() => setAiStatusMessage(null), 3000);
+              }}
+              className="px-4 py-2 bg-neutral-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-colors shadow-2xs"
+            >
+              Save AI Configuration
             </button>
           </div>
         </div>

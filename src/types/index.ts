@@ -74,7 +74,7 @@ export interface ActivityLog {
   timestamp: string;
   title: string;
   description: string;
-  category: 'paper' | 'question' | 'document' | 'plan' | 'backup' | 'exam' | 'workspace';
+  category: 'paper' | 'question' | 'document' | 'plan' | 'backup' | 'exam' | 'workspace' | 'ai';
 }
 
 export interface StudyMaterial {
@@ -244,6 +244,63 @@ export interface SpreadsheetWorkbook {
   updatedAt: string;
 }
 
+// Phase 4: AI & Quality Types
+export type AIProviderType = 'offline_local' | 'ollama' | 'openai' | 'gemini' | 'anthropic';
+
+export interface AIProviderConfig {
+  provider: AIProviderType;
+  endpointUrl?: string; // e.g. http://localhost:11434 for Ollama
+  apiKey?: string;
+  modelName: string;
+  hasUserConsent: boolean;
+}
+
+export interface SourceCitation {
+  documentTitle: string;
+  pageNumber?: number;
+  snippet: string;
+}
+
+export interface AIMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  sourceCitations?: SourceCitation[];
+  isSourceDerived?: boolean;
+}
+
+export interface CalculationCheckDiscrepancy {
+  item: string;
+  expected: string | number;
+  actual: string | number;
+  explanation: string;
+}
+
+export interface AnswerReviewResult {
+  id: string;
+  questionId: string;
+  evaluatedAt: string;
+  overallSummary: string;
+  technicalPointsFound: string[];
+  technicalPointsMissing: string[];
+  potentialAccountingErrors: string[];
+  unsupportedAssertions: string[];
+  differencesFromSolution: string[];
+  validAlternativePresentations: string[];
+  calculationDiscrepancies: CalculationCheckDiscrepancy[];
+  disclaimer: string;
+}
+
+export interface RevisionTopicStat {
+  topicName: string;
+  paperId: string;
+  totalAttempts: number;
+  averageScorePercent: number;
+  doubtsCount: number;
+  status: 'mastered' | 'solid' | 'needs_revision';
+}
+
 export interface BackupPayload {
   version: string;
   exportedAt: string;
@@ -258,4 +315,6 @@ export interface BackupPayload {
   examAttempts?: ExamAttemptRecord[];
   writtenAnswers?: WrittenAnswerDraft[];
   spreadsheets?: SpreadsheetWorkbook[];
+  aiConfig?: AIProviderConfig;
+  answerReviews?: AnswerReviewResult[];
 }

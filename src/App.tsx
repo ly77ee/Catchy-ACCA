@@ -21,6 +21,8 @@ import { ConnectedWorkspace } from './components/workspace/ConnectedWorkspace';
 import { Settings } from './components/settings/Settings';
 import { Help } from './components/help/Help';
 import { ComingSoon } from './components/common/ComingSoon';
+import { AIAssistant } from './components/ai/AIAssistant';
+import { RevisionAnalytics } from './components/revision/RevisionAnalytics';
 
 // Icons for Future Modules
 import { FileCheck, Table2, PenTool, TrendingUp, Bot } from 'lucide-react';
@@ -190,35 +192,29 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Future Phase: Revision & Progress Analytics */}
+      {/* Tab: Revision & Progress Analytics */}
       {activeTab === 'revision-progress' && (
-        <ComingSoon
-          title="Revision & Analytics Engine"
-          phase="Phase 3"
-          description="Deep analytics on your study pacing, question attempts, doubt resolution trends, and readiness heatmaps across all syllabus syllabus areas."
-          plannedFeatures={[
-            'Topic-level mastery matrix (identifying high-frequency and weak exam areas).',
-            'Weekly study pace tracking vs target exam session.',
-            'Mark progression curves across question attempts.',
-            'Exportable revision checklist.'
-          ]}
-          icon={TrendingUp}
+        <RevisionAnalytics
+          version={activeVersion}
+          allQuestions={questions || []}
+          paperRecords={paperRecordsArray || []}
+          examAttempts={examAttempts || []}
+          onLaunchPracticeExam={(paperId, questionIds) => {
+            setActiveTab('exam-environment');
+          }}
+          onOpenQuestionInWriter={(qId) => {
+            setActiveWorkspaceQuestionId(qId);
+            setActiveTab('answer-writer');
+          }}
         />
       )}
 
-      {/* Future Phase: AI Assistant */}
+      {/* Tab: AI Assistant */}
       {activeTab === 'ai-assistant' && (
-        <ComingSoon
-          title="AI ACCA Study Assistant"
-          phase="Phase 4"
-          description="An optional, privacy-respecting study mentor designed to help explain complex accounting standards (IFRS/IAS), dissect technical examiner articles, and review draft answers."
-          plannedFeatures={[
-            'Strictly optional with zero mandatory cloud subscriptions (BYOK / local model ready).',
-            'Clear consent indicators before processing any external prompts.',
-            'Trained prompt templates for IFRS interpretations and audit risk formulation.',
-            'Doubt clarifier that grounds responses in official syllabus outlines.'
-          ]}
-          icon={Bot}
+        <AIAssistant
+          version={activeVersion}
+          onNavigateSettings={() => setActiveTab('settings')}
+          onNavigateStudyMaterials={() => setActiveTab('study-materials')}
         />
       )}
 

@@ -50,7 +50,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
   const summary = calculateProgressSummary(version, paperRecords);
 
-  const navItems = [
+  const navItems: { id: string; label: string; icon: any; isFuture: boolean; phase?: string }[] = [
     { id: 'dashboard', label: 'Home', icon: Home, isFuture: false },
     { id: 'my-acca', label: 'My ACCA', icon: GraduationCap, isFuture: false },
     { id: 'study-materials', label: 'Study Materials', icon: BookOpen, isFuture: false },
@@ -58,8 +58,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     { id: 'exam-environment', label: 'Exam Environment', icon: FileCheck, isFuture: false },
     { id: 'excel-workspace', label: 'Excel Workspace', icon: Table2, isFuture: false },
     { id: 'answer-writer', label: 'Answer Writer', icon: PenTool, isFuture: false },
-    { id: 'revision-progress', label: 'Revision & Progress', icon: TrendingUp, isFuture: true, phase: 'Phase 3' },
-    { id: 'ai-assistant', label: 'AI Assistant', icon: Bot, isFuture: true, phase: 'Phase 4' },
+    { id: 'revision-progress', label: 'Revision & Progress', icon: TrendingUp, isFuture: false },
+    { id: 'ai-assistant', label: 'AI Assistant', icon: Bot, isFuture: false },
     { id: 'settings', label: 'Settings', icon: SettingsIcon, isFuture: false },
     { id: 'help', label: 'Help', icon: LifeBuoy, isFuture: false },
   ];

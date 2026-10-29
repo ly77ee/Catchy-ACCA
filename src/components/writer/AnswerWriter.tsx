@@ -32,8 +32,12 @@ import {
   Plus,
   Trash2,
   Check,
-  FileText
+  FileText,
+  Sparkles
 } from 'lucide-react';
+import { AnswerReviewModal } from './AnswerReviewModal';
+import { evaluateWrittenAnswer } from '../../utils/answerReviewEngine';
+import { AnswerReviewResult } from '../../types';
 
 interface AnswerWriterProps {
   version: QualificationVersion;
@@ -58,6 +62,9 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
   const [activeAttemptIndex, setActiveAttemptIndex] = useState<number>(0);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'dirty'>('saved');
   const [copySuccess, setCopySuccess] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewResult, setReviewResult] = useState<AnswerReviewResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -241,6 +248,25 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
     editor.commands.insertTable({ rows: 3, cols: 3, withHeaderRow: true });
   };
 
+  const handleRunReview = () => {
+    if (!editor) return;
+    setIsAnalyzing(true);
+    setIsReviewModalOpen(true);
+    setTimeout(() => {
+      const studentText = editor.getText();
+      const benchmarkModel = selectedQuestion?.notes || selectedQuestion?.title || 'Standard ACCA model answer';
+      const result = evaluateWrittenAnswer({
+        questionId: selectedQuestionId || 'general-draft',
+        studentAnswerText: studentText,
+        modelAnswer: benchmarkModel,
+        markingGuide: selectedQuestion?.notes,
+        paperId: selectedPaperId,
+      });
+      setReviewResult(result);
+      setIsAnalyzing(false);
+    }, 350);
+  };
+
   const wordCount = editor ? (editor.getText().trim() ? editor.getText().trim().split(/\s+/).length : 0) : 0;
   const charCount = editor ? editor.getText().length : 0;
 
@@ -302,6 +328,19 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
               Open Workings Grid
             </button>
           )}
+
+          <button
+            onClick={() => {
+              setIsReviewModalOpen(true);
+              if (!reviewResult) {
+                handleRunReview();
+              }
+            }}
+            className="text-xs font-bold bg-acca-50 dark:bg-acca-950/40 text-acca-700 dark:text-acca-300 hover:bg-acca-100 border border-acca-200 dark:border-acca-900 px-3 py-2 rounded-xl transition-colors flex items-center gap-1.5 shadow-2xs"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-acca-600" />
+            Review Answer
+          </button>
         </div>
       </div>
 
@@ -564,6 +603,16 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Answer Review & Model Comparison Modal */}
+      <AnswerReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        reviewResult={reviewResult}
+        isAnalyzing={isAnalyzing}
+        onRunReview={handleRunReview}
+        hasModelAnswer={Boolean(selectedQuestion?.notes || selectedQuestion?.title)}
+      />
     </div>
   );
 };

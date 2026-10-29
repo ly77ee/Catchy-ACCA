@@ -70,6 +70,32 @@ All documents, questions, exam responses, written answers, and spreadsheets rema
   - **Split View:** Side-by-side view with Word Answer Writer on the left and Excel Workings Grid on the right.
   - Both workspaces link directly to the selected ACCA paper and question.
 
+### Phase 4: AI Assistance, Answer Review & Final Quality
+- **Optional AI Provider Architecture:**
+  - Strictly optional layer. Core study tracking, question bank, PDF viewer, exam simulator, Answer Writer, and Excel Workings grid work 100% offline without any AI connection or external account.
+  - Supported providers:
+    - **Built-in Offline Engine:** 100% on-device educational tutor using comprehensive ACCA standards knowledge base and document citations. Zero network calls or API keys required.
+    - **Local Ollama:** Connect to a private local LLM instance (e.g. `http://localhost:11434`) without transmitting data to cloud services.
+    - **Cloud BYOK Providers:** Secure bring-your-own-key configuration for Google Gemini, OpenAI, and Anthropic.
+  - **Privacy Boundary & Consent:** API keys stored strictly in client-side localStorage. External transmission is blocked unless explicit user consent is affirmatively granted.
+- **ACCA Study Assistant (`AIAssistant`):**
+  - Answers technical queries across IFRS/IAS standards, audit methodologies (ISA), financial management (WACC, NPV), and management accounting.
+  - Grounds explanations in student-uploaded study PDFs with exact document and page number citations.
+  - Includes syllabus quick prompts and prominent educational guidance disclaimers.
+- **Written-Answer Review Engine (`answerReviewEngine`):**
+  - Directly accessible from the Answer Writer via the **Review Answer** modal.
+  - Evaluates student drafts against model solutions and marking schemes:
+    - **Technical Points Found vs Missing:** Highlights syllabus criteria identified in the student's text.
+    - **Accounting Checks:** Detects standard misconceptions (e.g., goodwill impairment reversal prohibition under IAS 36, off-balance leases under IFRS 16).
+    - **Deterministic Calculation Checking:** Cross-checks numerical values against expected workings and highlights discrepancies with explanations.
+    - **Alternative Valid Presentations:** Identifies permissible presentation variances (e.g., direct vs indirect cash flow method under IAS 7).
+    - **Unsupported Assertions:** Flags unhedged or unsubstantiated generalizations.
+- **Revision & Progress Analytics (`RevisionAnalytics`):**
+  - **Mistake & Doubt Journal:** Collects questions marked doubtful or where the student scored below 50% in CBE exam attempts. Allows 1-click doubt resolution and drafting.
+  - **Topic Mastery Matrix:** Calculates mastery percentage across syllabus topics, classifying them into *Mastered (≥75%)*, *Solid (50–74%)*, and *Needs Revision (<50% or active doubts)*.
+  - **Targeted Revision Exam Generator:** Creates a customized revision mock session focused exclusively on weak syllabus topics.
+  - **Exam Target Pacing:** Provides daily and weekly recommendations based on the student's planned exam session.
+
 ---
 
 ## 📋 Supported Question & Workspace Formats
@@ -113,7 +139,7 @@ http://localhost:5173
 
 ## 🧪 Running Automated Tests
 
-To run the Vitest test suite (47 automated unit and integration tests):
+To run the Vitest test suite (64 automated unit and integration tests across 13 test suites):
 ```bash
 npm test
 ```
