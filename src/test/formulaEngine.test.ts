@@ -1,0 +1,147 @@
+import { describe, it, expect } from 'vitest';
+import {
+  evaluateFormula,
+  recomputeSheet,
+  exportSheetToCsv,
+  importCsvToSheet,
+  calculateIRR,
+  formatCellValue
+} from '../utils/formulaEngine';
+import { CellData, SpreadsheetSheet } from '../types';
+
+describe('Spreadsheet Formula Engine & Financial Calculations', () => {
+  it('evaluates basic arithmetic and operator precedence', () => {
+    const cells: Record<string, CellData> = {};
+
+    expect(evaluateFormula('=10 + 20', cells)).toBe(30);
+    expect(evaluateFormula('=10 + 20 * 2', cells)).toBe(50);
+    expect(evaluateFormula('=(10 + 20) * 2', cells)).toBe(60);
+    expect(evaluateFormula('=2^3', cells)).toBe(8);
+    expect(evaluateFormula('=100 / 4 - 5', cells)).toBe(20);
+  });
+
+  it('evaluates cell references accurately', () => {
+    const cells: Record<string, CellData> = {
+      A1: { raw: '100' },
+      A2: { raw: '250' },
+      B1: { raw: '=A1 + A2' }
+    };
+
+    expect(evaluateFormula('=A1 + A2', cells)).toBe(350);
+    expect(evaluateFormula('=B1 * 2', cells)).toBe(700);
+  });
+
+  it('evaluates SUM, AVERAGE, MIN, MAX, and COUNT functions', () => {
+    const cells: Record<string, CellData> = {
+      A1: { raw: '10' },
+      A2: { raw: '20' },
+      A3: { raw: '30' },
+      A4: { raw: '40' },
+    };
+
+    expect(evaluateFormula('=SUM(A1:A4)', cells)).toBe(100);
+    expect(evaluateFormula('=AVERAGE(A1:A4)', cells)).toBe(25);
+    expect(evaluateFormula('=MIN(A1:A4)', cells)).toBe(10);
+    expect(evaluateFormula('=MAX(A1:A4)', cells)).toBe(40);
+    expect(evaluateFormula('=COUNT(A1:A4)', cells)).toBe(4);
+  });
+
+  it('calculates Net Present Value (NPV) matching official DCF test vectors', () => {
+    // Discount rate = 10% (0.10)
+    // Cash flows: Year 1 = 35000, Year 2 = 45000, Year 3 = 50000
+    // Present Values:
+    // Y1 = 35000 / 1.10 = 31818.18
+    // Y2 = 45000 / 1.10^2 = 37190.08
+    // Y3 = 50000 / 1.10^3 = 37565.74
+    // Expected Sum = 106574.00
+    const cells: Record<string, CellData> = {
+      A1: { raw: '0.10' },
+      B1: { raw: '35000' },
+      B2: { raw: '45000' },
+      B3: { raw: '50000' },
+    };
+
+    const npv = evaluateFormula('=NPV(A1, B1:B3)', cells);
+    expect(npv).toBe(106574);
+  });
+
+  it('calculates Internal Rate of Return (IRR) with Newton-Raphson', () => {
+    // Investment of $1000, returns of $300, $420, $680
+    // Verified financial rate: ~15.93% (0.1593)
+    const cashFlows = [-1000, 300, 420, 680];
+    const irr = calculateIRR(cashFlows);
+    expect(typeof irr).toBe('number');
+    expect(irr).toBeCloseTo(0.1593, 2);
+  });
+
+  it('evaluates logical IF and ROUND functions', () => {
+    const cells: Record<string, CellData> = {
+      A1: { raw: '75' },
+    };
+
+    expect(evaluateFormula('=IF(A1 >= 50, 100, 0)', cells)).toBe(100);
+    expect(evaluateFormula('=IF(A1 < 50, 100, 0)', cells)).toBe(0);
+
+    expect(evaluateFormula('=ROUND(123.456, 2)', cells)).toBe(123.46);
+    expect(evaluateFormula('=ROUND(123.456, 0)', cells)).toBe(123);
+  });
+
+  it('detects division by zero and returns #DIV/0!', () => {
+    const cells: Record<string, CellData> = {
+      A1: { raw: '100' },
+      A2: { raw: '0' },
+    };
+
+    expect(evaluateFormula('=A1 / A2', cells)).toBe('#DIV/0!');
+    expect(evaluateFormula('=A1 / 0', cells)).toBe('#DIV/0!');
+  });
+
+  it('detects circular references and returns #CIRCULAR!', () => {
+    const cells: Record<string, CellData> = {
+      A1: { raw: '=B1 + 10' },
+      B1: { raw: '=A1 * 2' },
+    };
+
+    expect(evaluateFormula('=B1 + 10', cells, 'A1')).toBe('#CIRCULAR!');
+  });
+
+  it('handles unknown functions with #NAME?', () => {
+    const cells: Record<string, CellData> = {};
+    expect(evaluateFormula('=NONEXISTENT_FN(10)', cells)).toBe('#NAME?');
+  });
+
+  it('exports to CSV and correctly re-imports with formulas', () => {
+    const sheet: SpreadsheetSheet = {
+      id: 'test-sheet',
+      name: 'Cash Flow',
+      cells: {
+        A1: { raw: 'Revenue' },
+        B1: { raw: '50000' },
+        A2: { raw: 'Costs' },
+        B2: { raw: '30000' },
+        A3: { raw: 'Profit' },
+        B3: { raw: '=B1-B2' },
+      },
+      rowCount: 5,
+      colCount: 3
+    };
+
+    const recomputed = recomputeSheet(sheet);
+    expect(recomputed.cells['B3']?.computed).toBe(20000);
+
+    const csv = exportSheetToCsv(recomputed);
+    expect(csv).toContain('Revenue');
+    expect(csv).toContain('50000');
+
+    const imported = importCsvToSheet(csv, 'Reopened');
+    expect(imported.name).toBe('Reopened');
+    expect(imported.cells['A1']?.raw).toBe('Revenue');
+    expect(imported.cells['B1']?.computed).toBe(50000);
+  });
+
+  it('formats cell values according to currency and percentage rules', () => {
+    expect(formatCellValue(1250.5, 'currency')).toBe('$1,250.50');
+    expect(formatCellValue(0.125, 'percent')).toBe('12.5%');
+    expect(formatCellValue('#DIV/0!', 'currency')).toBe('#DIV/0!');
+  });
+});

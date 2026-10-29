@@ -7,7 +7,9 @@ import {
   ActivityLog,
   StudentTarget,
   BackupPayload,
-  ExamAttemptRecord
+  ExamAttemptRecord,
+  WrittenAnswerDraft,
+  SpreadsheetWorkbook
 } from '../types';
 
 export class CatchyAccaDatabase extends Dexie {
@@ -18,6 +20,8 @@ export class CatchyAccaDatabase extends Dexie {
   activityLogs!: Table<ActivityLog, string>;
   targets!: Table<StudentTarget, string>;
   examAttempts!: Table<ExamAttemptRecord, string>;
+  writtenAnswers!: Table<WrittenAnswerDraft, string>;
+  spreadsheets!: Table<SpreadsheetWorkbook, string>;
 
   constructor() {
     super('CatchyAccaDB');
@@ -31,9 +35,14 @@ export class CatchyAccaDatabase extends Dexie {
       targets: 'id'
     });
 
-    // Version 2 adds examAttempts table for Phase 2 Exam Simulator
     this.version(2).stores({
       examAttempts: 'id, paperId, status, startedAt, completedAt'
+    });
+
+    // Version 3 adds writtenAnswers and spreadsheets for Phase 3
+    this.version(3).stores({
+      writtenAnswers: 'id, questionId, paperId, updatedAt',
+      spreadsheets: 'id, questionId, paperId, updatedAt'
     });
   }
 }
@@ -236,12 +245,26 @@ export async function initializeDatabase(): Promise<void> {
       }
     ]);
 
+    // Seed initial starter written answer
+    await db.writtenAnswers.put({
+      id: 'ans-seed-1',
+      questionId: 'q-seed-1',
+      paperId: 'FR',
+      title: 'Consolidation Draft Working — Model Answer',
+      attemptNumber: 1,
+      contentHtml: '<h3>Consolidated Statement of Financial Position</h3><p><strong>Goodwill Working:</strong></p><p>Consideration transferred: $120,000<br/>Fair value of Non-controlling interest (NCI): $30,000<br/>Less: Net assets acquired ($110,000)<br/><strong>Goodwill at acquisition: $40,000</strong></p>',
+      plainText: 'Consolidated Statement of Financial Position\nGoodwill Working:\nConsideration transferred: $120,000\nFair value of NCI: $30,000\nLess Net Assets: $110,000\nGoodwill: $40,000',
+      wordCount: 32,
+      createdAt: now,
+      updatedAt: now
+    });
+
     // Seed initial activity log
     await db.activityLogs.put({
       id: 'act-1',
       timestamp: now,
       title: 'Workspace Initialized',
-      description: 'Catchy ACCA profile created with initial progress, study plan, and starter questions.',
+      description: 'Catchy ACCA profile created with initial progress, study plan, starter questions, and workspaces.',
       category: 'paper'
     });
   }
@@ -307,12 +330,14 @@ export async function createBackupPayload(versionId: string): Promise<BackupPayl
   const targets = await db.targets.toArray();
   const activityLogs = await db.activityLogs.toArray();
   const examAttempts = await db.examAttempts.toArray();
+  const writtenAnswers = await db.writtenAnswers.toArray();
+  const spreadsheets = await db.spreadsheets.toArray();
 
   // Strip large binary blobs from JSON backup for safety & portability
   const sanitizedMaterials = studyMaterials.map(({ pdfData, ...rest }) => rest);
 
   return {
-    version: '1.1.0',
+    version: '1.2.0',
     exportedAt: new Date().toISOString(),
     app: 'Catchy ACCA · by ly77ee',
     qualificationVersionId: versionId,
@@ -322,7 +347,9 @@ export async function createBackupPayload(versionId: string): Promise<BackupPayl
     studyPlans,
     targets,
     activityLogs,
-    examAttempts
+    examAttempts,
+    writtenAnswers,
+    spreadsheets
   };
 }
 
@@ -335,6 +362,8 @@ export interface RestoreValidationResult {
     materialsCount: number;
     plansCount: number;
     attemptsCount: number;
+    answersCount: number;
+    spreadsheetsCount: number;
     exportedAt: string;
   };
 }
@@ -365,6 +394,8 @@ export function validateBackupPayload(data: unknown): RestoreValidationResult {
       materialsCount: Array.isArray(payload.studyMaterials) ? payload.studyMaterials.length : 0,
       plansCount: Array.isArray(payload.studyPlans) ? payload.studyPlans.length : 0,
       attemptsCount: Array.isArray(payload.examAttempts) ? payload.examAttempts.length : 0,
+      answersCount: Array.isArray(payload.writtenAnswers) ? payload.writtenAnswers.length : 0,
+      spreadsheetsCount: Array.isArray(payload.spreadsheets) ? payload.spreadsheets.length : 0,
       exportedAt: payload.exportedAt || 'Unknown'
     }
   };
@@ -372,13 +403,24 @@ export function validateBackupPayload(data: unknown): RestoreValidationResult {
 
 export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'overwrite'): Promise<void> {
   if (mode === 'overwrite') {
-    await db.transaction('rw', [db.paperRecords, db.questions, db.studyPlans, db.targets, db.activityLogs, db.examAttempts], async () => {
+    await db.transaction('rw', [
+      db.paperRecords,
+      db.questions,
+      db.studyPlans,
+      db.targets,
+      db.activityLogs,
+      db.examAttempts,
+      db.writtenAnswers,
+      db.spreadsheets
+    ], async () => {
       await db.paperRecords.clear();
       await db.questions.clear();
       await db.studyPlans.clear();
       await db.targets.clear();
       await db.activityLogs.clear();
       await db.examAttempts.clear();
+      await db.writtenAnswers.clear();
+      await db.spreadsheets.clear();
 
       if (payload.paperRecords?.length) await db.paperRecords.bulkPut(payload.paperRecords);
       if (payload.questions?.length) await db.questions.bulkPut(payload.questions);
@@ -386,6 +428,8 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       if (payload.targets?.length) await db.targets.bulkPut(payload.targets);
       if (payload.activityLogs?.length) await db.activityLogs.bulkPut(payload.activityLogs);
       if (payload.examAttempts?.length) await db.examAttempts.bulkPut(payload.examAttempts);
+      if (payload.writtenAnswers?.length) await db.writtenAnswers.bulkPut(payload.writtenAnswers);
+      if (payload.spreadsheets?.length) await db.spreadsheets.bulkPut(payload.spreadsheets);
     });
   } else {
     // Merge mode: upsert records
@@ -394,6 +438,8 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
     if (payload.studyPlans?.length) await db.studyPlans.bulkPut(payload.studyPlans);
     if (payload.targets?.length) await db.targets.bulkPut(payload.targets);
     if (payload.examAttempts?.length) await db.examAttempts.bulkPut(payload.examAttempts);
+    if (payload.writtenAnswers?.length) await db.writtenAnswers.bulkPut(payload.writtenAnswers);
+    if (payload.spreadsheets?.length) await db.spreadsheets.bulkPut(payload.spreadsheets);
   }
 
   await logActivity(

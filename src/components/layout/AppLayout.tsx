@@ -56,8 +56,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     { id: 'study-materials', label: 'Study Materials', icon: BookOpen, isFuture: false },
     { id: 'questions', label: 'Questions', icon: HelpCircle, isFuture: false },
     { id: 'exam-environment', label: 'Exam Environment', icon: FileCheck, isFuture: false },
-    { id: 'excel-workspace', label: 'Excel Workspace', icon: Table2, isFuture: true, phase: 'Phase 2' },
-    { id: 'answer-writer', label: 'Answer Writer', icon: PenTool, isFuture: true, phase: 'Phase 3' },
+    { id: 'excel-workspace', label: 'Excel Workspace', icon: Table2, isFuture: false },
+    { id: 'answer-writer', label: 'Answer Writer', icon: PenTool, isFuture: false },
     { id: 'revision-progress', label: 'Revision & Progress', icon: TrendingUp, isFuture: true, phase: 'Phase 3' },
     { id: 'ai-assistant', label: 'AI Assistant', icon: Bot, isFuture: true, phase: 'Phase 4' },
     { id: 'settings', label: 'Settings', icon: SettingsIcon, isFuture: false },
@@ -287,7 +287,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
             <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 px-3 pb-1 block">
               Core Study Tools
             </span>
-            {navItems.slice(0, 5).map((item) => {
+            {navItems.slice(0, 7).map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
@@ -317,7 +317,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
               </span>
             </div>
 
-            {navItems.slice(5, 9).map((item) => {
+            {navItems.slice(7, 9).map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (

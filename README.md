@@ -1,14 +1,14 @@
 # Catchy ACCA · by ly77ee
 
-> A clean, modern, beginner-friendly desktop study companion and exam progress manager for ACCA students worldwide. Built with React, TypeScript, Tailwind CSS, and local-first IndexedDB persistence.
+> A clean, modern, beginner-friendly desktop study companion and exam progress manager for ACCA students worldwide. Built with React, TypeScript, Tailwind CSS, TipTap rich text, and local-first IndexedDB persistence.
 
 ---
 
 ## 📖 Product Objective
 
-**Catchy ACCA** gives ACCA students a dedicated, private, and distraction-free workspace on their computer. Students can track their qualification progress, import their study materials, extract questions intelligently, practise in a faithful CBE exam simulator, flag doubts, and prepare systematically for upcoming exam sessions.
+**Catchy ACCA** gives ACCA students a dedicated, private, and distraction-free workspace on their computer. Students can track their qualification progress, import their study materials, extract questions intelligently, practice in a faithful CBE exam simulator, write constructed responses, build spreadsheet financial workings, and prepare systematically for upcoming exam sessions.
 
-All documents, questions, exam responses, and notes remain **100% on your device** in local browser storage (IndexedDB). No cloud account, third-party login, or paid AI subscription is required to use the core application.
+All documents, questions, exam responses, written answers, and spreadsheets remain **100% on your device** in local browser storage (IndexedDB). No cloud account, third-party login, or paid AI subscription is required.
 
 ---
 
@@ -17,7 +17,7 @@ All documents, questions, exam responses, and notes remain **100% on your device
 - **ACCA-Inspired Palette:** High-contrast professional black (`#141419`), charcoal slate (`#1e1e24`), crisp white, and ACCA signature red (`#c00000`).
 - **Circular Progress Indicators:** Circular rings showing overall qualification completion, individual paper progress, and exam simulation scores.
 - **Typographic Wordmark:** Distinctive **Catchy ACCA** typographic wordmark with creator credit **by ly77ee**.
-- **Honest Engineering:** Features are implemented with genuine functionality or clearly labeled with roadmap notes for future phases. Never pretends to auto-grade open essays without an official marking guide.
+- **Real Engineering:** The Word-like and Excel-like workspaces are full functional tools with genuine formula calculations and rich-text editing, not decorative mockups.
 
 ---
 
@@ -31,36 +31,57 @@ All documents, questions, exam responses, and notes remain **100% on your device
 - **Persistence & Backup:** Relational IndexedDB storage via Dexie.js with JSON export/import and pre-flight validation.
 
 ### Phase 2: Question Intelligence & Exam Simulator
-- **Intelligent Question Extraction:**
-  - Extracts question numbers, titles, prompts, subquestions, marks, options, and answer keys from imported study PDFs.
-  - Automatically detects scanned/image-only PDFs lacking an embedded text layer and alerts the user with helpful diagnostics.
-- **Interactive Review Screen (`ExtractionReviewModal`):**
-  - Allows students to review, edit, approve, or correct extracted questions, options, page references, and answer keys before importing them.
-  - Never silently invents missing questions or answers.
-- **Syllabus Topic Intelligence:**
-  - Analyzes extracted question text against official ACCA syllabus taxonomies (e.g., IFRS 15, IFRS 16, IAS 36, Consolidation, ABC, Variances, ISA 315).
-  - Recommends topic tags with keyword match density. Students can approve, edit, or reject suggestions.
-- **CBE Exam Simulator (`ExamEnvironment`):**
-  - **Setup Screen:** Configure paper, source document, topic filters, question format filters, question count, ordering (sequential, randomized, by topic), timer mode (timed or untimed), and solution feedback (immediate or delayed).
-  - Only offers question formats supported by the selected material.
-  - **Live Exam Delivery:** Focused interface with single question display, question navigator (answered, unanswered, current, flagged), flag-for-review toggle, live countdown timer with low-time visual alerts, and autosaved responses.
-  - **Results & Debrief:** Score percentage, marks awarded, question-by-question review, official answer keys, and marking guide explanations.
-- **Attempt History:**
-  - Stores completed simulations in IndexedDB with time spent, marks, responses, and review flags.
-  - Automatically synchronizes with Dashboard activity logs and Question Manager attempt records.
+- **Intelligent Question Extraction:** Extracts question numbers, titles, prompts, subquestions, marks, options, and answer keys from imported study PDFs with image-only scan detection.
+- **Verification & Review Screen:** Review, edit, approve, or adjust question data, options, marks, and answer keys before importing.
+- **Syllabus Topic Intelligence:** Recommends syllabus topic tags based on official standard taxonomies (IFRS 15, IFRS 16, IAS 36, Consolidation, ABC, Variances, etc.).
+- **CBE Exam Simulator:** Timed and untimed simulations with single/multi-select auto-marking, question navigator, flag-for-review, and detailed debrief screens.
+- **Attempt History:** Stores historical simulations and synchronizes results with dashboard metrics.
+
+### Phase 3: Answer Writer & Spreadsheet Workspace
+- **Integrated Answer Writer (`AnswerWriter`):**
+  - Powered by **TipTap** rich-text editor running 100% offline.
+  - Headings (H1, H2, H3), paragraphs, bold, italic, underline, bullet lists, numbered lists, and interactive tables.
+  - Undo and redo history with keyboard shortcuts (`Ctrl+Z`, `Ctrl+Y`, `Ctrl+B`, `Ctrl+I`, `Ctrl+U`).
+  - Automatic draft saving to IndexedDB with debounced change detection.
+  - Multiple attempt management: save and revisit multiple versions (`Attempt #1`, `Attempt #2`) for the same question.
+  - Word count, character count, and last-saved timestamp.
+  - Copy to clipboard and export in **Plain Text (.txt)**, **Markdown (.md)**, and **HTML (.html)**.
+- **Integrated Spreadsheet Workspace (`SpreadsheetWorkspace`):**
+  - Grid interface matching ACCA CBE spreadsheet specifications.
+  - Cell selection, keyboard navigation (`Arrow keys`, `Enter`, `Escape`), and formula input (`=fx`).
+  - **Deterministic Formula Engine:**
+    - Arithmetic: `+`, `-`, `*`, `/`, `^`, parentheses, unary minus.
+    - Cell references (`A1`, `B2`) and range expansion (`A1:A5`, `B2:D4`).
+    - Financial & Statistical Functions: `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`.
+    - `NPV(rate, cash_flows)`: Exact discounted cash flow calculation $\sum \frac{CF_t}{(1+r)^t}$.
+    - `IRR(range, [guess])`: Newton-Raphson approximation for Internal Rate of Return.
+    - `PMT(rate, nper, pv)`: Annuity/loan repayment calculation.
+    - `ROUND(number, [digits])`, `ABS(number)`, `IF(condition, if_true, [if_false])`.
+    - Error handling: `#DIV/0!`, `#NAME?`, `#VALUE!`, `#REF!`, `#CIRCULAR!`.
+  - Cell formatting: Currency (`$ / £`), Percent (`%`), Decimals, and Bold.
+  - Financial statement layout templates:
+    - *Statement of Financial Position (Balance Sheet)*
+    - *Investment Appraisal (NPV & Cash Flows Working)*
+  - Multi-sheet workbooks (add sheet, switch sheet).
+  - Undo and redo stack for sheet edits.
+  - CSV exchange: **Export CSV** and **Import CSV**.
+- **Connected Workspace (`ConnectedWorkspace`):**
+  - Access both the Answer Writer and Spreadsheet Workspace simultaneously from any question without losing context.
+  - **Split View:** Side-by-side view with Word Answer Writer on the left and Excel Workings Grid on the right.
+  - Both workspaces link directly to the selected ACCA paper and question.
 
 ---
 
-## 📋 Supported vs. Unsupported Question Formats
+## 📋 Supported Question & Workspace Formats
 
-| Format | Support Status | Evaluation Method | Notes |
+| Format | Support Status | Evaluation Method | Implementation Details |
 | :--- | :---: | :--- | :--- |
-| **Section A Objective MCQ (Single-Select)** | **Full** | Automated (Answer Key) | Exact match with verified answer key (A, B, C, D). |
-| **Section A/B Multi-Select Objective** | **Full** | Automated (Partial Credit) | Evaluates all correct selections; proportional credit if partially correct with zero wrong choices. |
-| **Section C Constructed Response (Essay)** | **Full** | Self-Evaluation (Marking Guide) | Candidate response workspace with word count; evaluated against official marking guide points after submission. Does not simulate arbitrary grading. |
-| **Financial Calculation / Numerical** | **Full** | Self-Evaluation / Solution Workings | Working area with step-by-step model solution review. |
-| **Scanned Image-Only PDFs (without OCR text)** | *Requires Manual Entry* | N/A | System detects missing text layers and alerts user instead of corrupting data. |
-| **Interactive Drag-and-Drop CBE Hotspots** | *Future / Manual Entry* | N/A | Proprietary ACCA CBE proprietary interactive widgets. |
+| **Section A Objective MCQ (Single-Select)** | **Full** | Automated Marking | Exact match against verified answer key (A, B, C, D). |
+| **Section A/B Multi-Select Objective** | **Full** | Automated (Partial Credit) | Proportional partial credit if partially correct with zero wrong choices. |
+| **Section C Constructed Response (Essay)** | **Full** | Self-Evaluation (Marking Scheme) | Word processor with headings, tables, word counter, and marking points comparison. |
+| **Financial Calculations & Workings** | **Full** | Deterministic Formula Grid | Formula calculations (NPV, IRR, SUM, etc.) with verified mathematical results. |
+| **Spreadsheet File Exchange** | **Full** | RFC 4180 CSV Import/Export | Export sheets to `.csv` or import external CSV spreadsheets into new sheets. |
+| **Constructed Response Export** | **Full** | TXT, MD, HTML | Export written responses in plain text, markdown, or clean styled HTML. |
 
 ---
 
@@ -92,7 +113,7 @@ http://localhost:5173
 
 ## 🧪 Running Automated Tests
 
-To run the Vitest test suite (32 automated unit and integration tests):
+To run the Vitest test suite (47 automated unit and integration tests):
 ```bash
 npm test
 ```
@@ -104,58 +125,13 @@ npm run build
 
 ---
 
-## 📂 Project Directory Structure
-
-```
-catchy-acca/
-├── src/
-│   ├── components/
-│   │   ├── common/           # CircularProgress, Badge, Modal, EmptyState, ComingSoon
-│   │   ├── dashboard/        # Main Dashboard, metrics, study plan, next exam countdown
-│   │   ├── exam/             # Exam Environment, Setup, Live Session, Results, History
-│   │   ├── extraction/       # Extraction Review Screen & verification
-│   │   ├── help/             # User guide & ACCA student documentation
-│   │   ├── layout/           # AppLayout, navigation sidebar, global search bar
-│   │   ├── qualification/    # My ACCA qualification tracking & syllabus version switcher
-│   │   ├── questions/        # Question manager, doubt flags, topic grouping, attempts
-│   │   ├── settings/         # Local persistence explanation, JSON backup & restore
-│   │   └── study-materials/  # PDF library, viewer & question extraction trigger
-│   ├── config/
-│   │   ├── accaStructure.ts  # Official ACCA syllabus structure & progress math
-│   │   └── syllabusTopics.ts # Syllabus topic taxonomies & keyword matching
-│   ├── db/
-│   │   └── index.ts          # Dexie.js IndexedDB database (v2 with examAttempts)
-│   ├── test/
-│   │   ├── accaStructure.test.ts    # Qualification rules & percentage math tests
-│   │   ├── backupValidation.test.ts # JSON backup validation tests
-│   │   ├── components.test.tsx      # CircularProgress & Badge UI tests
-│   │   ├── examScoring.test.ts      # Marking rules, partial credit & question ordering
-│   │   ├── integration.test.tsx     # Phase 1 IndexedDB workflow tests
-│   │   ├── pdfExtractor.test.ts     # Extraction parsing & topic intelligence tests
-│   │   └── phase2Integration.test.tsx # Exam simulation & attempt history tests
-│   ├── types/
-│   │   └── index.ts          # Core TypeScript type definitions (Phase 1 & 2)
-│   ├── utils/
-│   │   ├── examScoring.ts    # Answer key evaluation & partial credit algorithms
-│   │   └── pdfExtractor.ts   # PDF text extraction & pattern parser
-│   ├── App.tsx               # Root component & reactive queries
-│   ├── main.tsx              # React DOM mounting
-│   └── index.css             # Tailwind CSS & global styles
-├── index.html                # HTML entry point with Catchy ACCA wordmark
-├── package.json              # Project dependencies & npm scripts
-├── tailwind.config.js        # ACCA color scheme configuration
-├── tsconfig.json             # TypeScript configuration
-└── vite.config.ts            # Vite & Vitest configuration
-```
-
----
-
 ## 📜 Dependency & License Inventory
 
 Catchy ACCA is built exclusively with permissive, maintained open-source libraries:
 - **React 18** (MIT License) — UI library
 - **TypeScript** (Apache 2.0) — Type safety and developer experience
 - **Vite** (MIT License) — Build tool and dev server
+- **TipTap Core & Extensions** (MIT License) — Rich-text editing engine
 - **Dexie.js** (Apache 2.0) — IndexedDB client library for local persistence
 - **PDF.js (`pdfjs-dist`)** (Apache 2.0) — Mozilla's PDF rendering engine
 - **Tailwind CSS** (MIT License) — Utility-first styling system

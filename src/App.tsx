@@ -17,6 +17,7 @@ import { MyAcca } from './components/qualification/MyAcca';
 import { StudyMaterials } from './components/study-materials/StudyMaterials';
 import { Questions } from './components/questions/Questions';
 import { ExamEnvironment } from './components/exam/ExamEnvironment';
+import { ConnectedWorkspace } from './components/workspace/ConnectedWorkspace';
 import { Settings } from './components/settings/Settings';
 import { Help } from './components/help/Help';
 import { ComingSoon } from './components/common/ComingSoon';
@@ -32,6 +33,7 @@ export const App: React.FC = () => {
   // Cross-component navigation state (e.g. from question click -> open PDF at specific page)
   const [activePdfMaterialId, setActivePdfMaterialId] = useState<string | null>(null);
   const [activePdfPage, setActivePdfPage] = useState<number>(1);
+  const [activeWorkspaceQuestionId, setActiveWorkspaceQuestionId] = useState<string | undefined>(undefined);
 
   // Initialize DB on boot
   useEffect(() => {
@@ -141,6 +143,14 @@ export const App: React.FC = () => {
           questions={questions || []}
           materials={studyMaterials || []}
           onOpenPdfAtPage={handleOpenPdfAtPage}
+          onOpenInWriter={(qId) => {
+            setActiveWorkspaceQuestionId(qId);
+            setActiveTab('answer-writer');
+          }}
+          onOpenInSpreadsheet={(qId) => {
+            setActiveWorkspaceQuestionId(qId);
+            setActiveTab('excel-workspace');
+          }}
         />
       )}
 
@@ -158,35 +168,25 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Future Phase: Excel Workspace */}
+      {/* Tab: Excel Workspace */}
       {activeTab === 'excel-workspace' && (
-        <ComingSoon
-          title="Excel Spreadsheet Workspace"
-          phase="Phase 2"
-          description="In-built spreadsheet calculations matching the ACCA CBE response sheet specifications. Perform live financial modeling, ratios, and balance sheet reconciliations."
-          plannedFeatures={[
-            'Full formula calculations (SUM, NPV, IRR, AVERAGE, IF, LOOKUP).',
-            'Pre-formatted financial statements (Statement of Financial Position, Profit or Loss, Cash Flows).',
-            'Cell formatting, bolding, underline, borders, and number formatting.',
-            'Automatic cross-linking with Section C questions.'
-          ]}
-          icon={Table2}
+        <ConnectedWorkspace
+          version={activeVersion}
+          allQuestions={questions || []}
+          initialQuestionId={activeWorkspaceQuestionId}
+          initialPaperId={currentTarget?.nextExamPaperId || 'FR'}
+          defaultMode="spreadsheet"
         />
       )}
 
-      {/* Future Phase: Answer Writer */}
+      {/* Tab: Answer Writer */}
       {activeTab === 'answer-writer' && (
-        <ComingSoon
-          title="Constructed Answer Writer"
-          phase="Phase 3"
-          description="A dedicated word processing environment built specifically for ACCA theory, essay, and case study responses (e.g. SBL, SBR, AAA)."
-          plannedFeatures={[
-            'Clean markdown and rich-text word processor.',
-            'Word count, time tracking, and professional presentation formatting.',
-            'Standard ACCA answer structuring guides (Heading, Issue, Rule, Application, Conclusion).',
-            'Persistent draft history with side-by-side question review.'
-          ]}
-          icon={PenTool}
+        <ConnectedWorkspace
+          version={activeVersion}
+          allQuestions={questions || []}
+          initialQuestionId={activeWorkspaceQuestionId}
+          initialPaperId={currentTarget?.nextExamPaperId || 'FR'}
+          defaultMode="writer"
         />
       )}
 

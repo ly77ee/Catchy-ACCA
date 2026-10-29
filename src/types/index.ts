@@ -74,7 +74,7 @@ export interface ActivityLog {
   timestamp: string;
   title: string;
   description: string;
-  category: 'paper' | 'question' | 'document' | 'plan' | 'backup' | 'exam';
+  category: 'paper' | 'question' | 'document' | 'plan' | 'backup' | 'exam' | 'workspace';
 }
 
 export interface StudyMaterial {
@@ -201,6 +201,49 @@ export interface ExtractedQuestionDraft {
   isApproved: boolean;
 }
 
+// Phase 3: Answer Writer Types
+export interface WrittenAnswerDraft {
+  id: string;
+  questionId?: string;
+  paperId: string;
+  title: string;
+  attemptNumber: number;
+  contentJson?: any;
+  contentHtml: string;
+  plainText: string;
+  wordCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Phase 3: Spreadsheet Workspace Types
+export type CellFormat = 'general' | 'currency' | 'percent' | 'number' | 'bold' | 'header';
+
+export interface CellData {
+  raw: string; // Raw input e.g. "=SUM(A1:A5)" or "100" or "Revenue"
+  computed?: any; // Evaluated value e.g. 500 or "#DIV/0!"
+  format?: CellFormat;
+}
+
+export interface SpreadsheetSheet {
+  id: string;
+  name: string;
+  cells: Record<string, CellData>; // keyed by cell address "A1", "B2", etc.
+  rowCount: number;
+  colCount: number;
+}
+
+export interface SpreadsheetWorkbook {
+  id: string;
+  questionId?: string;
+  paperId: string;
+  title: string;
+  activeSheetIndex: number;
+  sheets: SpreadsheetSheet[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BackupPayload {
   version: string;
   exportedAt: string;
@@ -208,9 +251,11 @@ export interface BackupPayload {
   qualificationVersionId: string;
   paperRecords: StudentPaperRecord[];
   questions: QuestionRecord[];
-  studyMaterials: Omit<StudyMaterial, 'pdfData'>[]; // metadata exported in JSON
+  studyMaterials: Omit<StudyMaterial, 'pdfData'>[];
   studyPlans: StudyPlanItem[];
   targets: StudentTarget[];
   activityLogs: ActivityLog[];
   examAttempts?: ExamAttemptRecord[];
+  writtenAnswers?: WrittenAnswerDraft[];
+  spreadsheets?: SpreadsheetWorkbook[];
 }

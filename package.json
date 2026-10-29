@@ -10,6 +10,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@tiptap/extension-table": "^3.32.1",
+    "@tiptap/extension-table-cell": "^3.32.1",
+    "@tiptap/extension-table-header": "^3.32.1",
+    "@tiptap/extension-table-row": "^3.32.1",
+    "@tiptap/extension-underline": "^3.32.1",
+    "@tiptap/react": "^3.32.1",
+    "@tiptap/starter-kit": "^3.32.1",
     "clsx": "^2.1.1",
     "dexie": "^4.0.10",
     "dexie-react-hooks": "^1.1.7",

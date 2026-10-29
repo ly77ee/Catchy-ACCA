@@ -15,7 +15,9 @@ import {
   Clock,
   Layers,
   List,
-  Folder
+  Folder,
+  PenTool,
+  Table2
 } from 'lucide-react';
 import {
   QuestionRecord,
@@ -35,6 +37,8 @@ interface QuestionsProps {
   questions: QuestionRecord[];
   materials: StudyMaterial[];
   onOpenPdfAtPage: (materialId: string, page: number) => void;
+  onOpenInWriter?: (questionId: string) => void;
+  onOpenInSpreadsheet?: (questionId: string) => void;
 }
 
 export const Questions: React.FC<QuestionsProps> = ({
@@ -42,6 +46,8 @@ export const Questions: React.FC<QuestionsProps> = ({
   questions,
   materials,
   onOpenPdfAtPage,
+  onOpenInWriter,
+  onOpenInSpreadsheet,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPaper, setFilterPaper] = useState('all');
@@ -517,23 +523,47 @@ export const Questions: React.FC<QuestionsProps> = ({
                       {/* Right: Actions & PDF Link */}
                       <div className="flex flex-wrap md:flex-col items-end justify-between gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
                         {/* Open in PDF button if linked */}
-                        {linkedMaterial && q.sourcePage ? (
-                          <button
-                            onClick={() => onOpenPdfAtPage(linkedMaterial.id, q.sourcePage || 1)}
-                            className="inline-flex items-center space-x-1.5 text-xs font-bold text-white bg-acca-red hover:bg-acca-red-dark px-3 py-1.5 rounded-lg shadow-xs transition-colors"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>Open PDF (p. {q.sourcePage})</span>
-                          </button>
-                        ) : linkedMaterial ? (
-                          <button
-                            onClick={() => onOpenPdfAtPage(linkedMaterial.id, 1)}
-                            className="inline-flex items-center space-x-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition-colors"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            <span>Open PDF</span>
-                          </button>
-                        ) : null}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {linkedMaterial && q.sourcePage ? (
+                            <button
+                              onClick={() => onOpenPdfAtPage(linkedMaterial.id, q.sourcePage || 1)}
+                              className="inline-flex items-center space-x-1.5 text-xs font-bold text-white bg-acca-red hover:bg-acca-red-dark px-2.5 py-1.5 rounded-lg shadow-xs transition-colors"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              <span>PDF (p. {q.sourcePage})</span>
+                            </button>
+                          ) : linkedMaterial ? (
+                            <button
+                              onClick={() => onOpenPdfAtPage(linkedMaterial.id, 1)}
+                              className="inline-flex items-center space-x-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition-colors"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>PDF</span>
+                            </button>
+                          ) : null}
+
+                          {onOpenInWriter && (
+                            <button
+                              onClick={() => onOpenInWriter(q.id)}
+                              className="inline-flex items-center space-x-1 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition-colors"
+                              title="Open in Answer Writer"
+                            >
+                              <PenTool className="w-3.5 h-3.5" />
+                              <span>Writer</span>
+                            </button>
+                          )}
+
+                          {onOpenInSpreadsheet && (
+                            <button
+                              onClick={() => onOpenInSpreadsheet(q.id)}
+                              className="inline-flex items-center space-x-1 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition-colors"
+                              title="Open in Spreadsheet Workings"
+                            >
+                              <Table2 className="w-3.5 h-3.5" />
+                              <span>Excel</span>
+                            </button>
+                          )}
+                        </div>
 
                         <div className="flex items-center space-x-1">
                           <button
