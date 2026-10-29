@@ -163,12 +163,19 @@ npm run build
 
 ---
 
+## 📄 Project License
+
+Catchy ACCA is free software released under the **GNU General Public License version 3.0 (GPL-3.0-only)**. You may redistribute and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation. See the [LICENSE](LICENSE) file for the full license text.
+
+---
+
 ## 📜 Dependency & License Inventory
 
-Catchy ACCA is built exclusively with permissive, maintained open-source libraries:
+Catchy ACCA itself is licensed under **GPL-3.0-only**, and incorporates standard open-source dependencies:
 - **React 18** (MIT License) — UI library
 - **TypeScript** (Apache 2.0) — Type safety and developer experience
 - **Vite** (MIT License) — Build tool and dev server
+- **Electron** (MIT License) — Desktop application runtime
 - **TipTap Core & Extensions** (MIT License) — Rich-text editing engine
 - **Dexie.js** (Apache 2.0) — IndexedDB client library for local persistence
 - **PDF.js (`pdfjs-dist`)** (Apache 2.0) — Mozilla's PDF rendering engine

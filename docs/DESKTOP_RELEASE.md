@@ -1,7 +1,7 @@
 # Catchy ACCA — Desktop Application Release Guide
 
 **Creator Credit:** Catchy ACCA · by ly77ee  
-**License:** Open Source (MIT)  
+**License:** GNU General Public License v3.0 (GPL-3.0-only)  
 **Distribution:** Windows (`.exe` NSIS) & macOS (`.dmg` Disk Image)
 
 ---

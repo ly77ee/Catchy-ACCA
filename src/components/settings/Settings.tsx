@@ -125,46 +125,46 @@ export const Settings: React.FC<SettingsProps> = ({
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-12">
       {/* Header */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs">
+      <div className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] p-6 shadow-xs">
         <div className="flex items-center space-x-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-acca-red bg-red-50 px-2.5 py-0.5 rounded-full">
+          <span className="text-xs font-bold uppercase tracking-wider text-acca-red bg-red-950/40 border border-red-800/40 px-2.5 py-0.5 rounded-full">
             Settings & Local Storage
           </span>
           <span className="text-xs text-gray-400">Offline Integrity</span>
         </div>
-        <h1 className="text-2xl font-extrabold text-gray-900 mt-1">
+        <h1 className="text-2xl font-extrabold text-white mt-1">
           Persistence, Backup & System Info
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-gray-400 mt-1">
           Manage your local IndexedDB storage, export portable backups, and review system licenses.
         </p>
       </div>
 
       {/* Local Persistence Architecture Explanation */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs space-y-4">
-        <div className="flex items-center space-x-3 pb-3 border-b border-gray-100">
+      <div className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] p-6 shadow-xs space-y-4">
+        <div className="flex items-center space-x-3 pb-3 border-b border-[#2a2a34]">
           <Database className="w-5 h-5 text-acca-red" />
-          <h2 className="text-base font-bold text-gray-900">
+          <h2 className="text-base font-bold text-white">
             Local Persistence Architecture
           </h2>
         </div>
 
-        <div className="prose prose-sm text-gray-600 leading-relaxed space-y-2 text-xs">
+        <div className="text-gray-300 leading-relaxed space-y-2 text-xs">
           <p>
-            Catchy ACCA utilizes <strong>IndexedDB</strong> as its primary on-device storage engine through <strong>Dexie.js</strong>.
+            Catchy ACCA utilizes <strong className="text-white">IndexedDB</strong> as its primary on-device storage engine through <strong className="text-white">Dexie.js</strong>.
           </p>
-          <ul className="list-disc pl-5 space-y-1 text-gray-700">
+          <ul className="list-disc pl-5 space-y-1 text-gray-300">
             <li>
-              <strong>Zero External Tracking:</strong> All student exam scores, notes, questions, and uploaded PDF documents are stored locally in your browser's private sandboxed IndexedDB.
+              <strong className="text-white">Zero External Tracking:</strong> All student exam scores, notes, questions, and uploaded PDF documents are stored locally in your browser's private sandboxed IndexedDB.
             </li>
             <li>
-              <strong>No Account Required:</strong> You don't need to log in, register, or connect a cloud account to use any of the core study tools.
+              <strong className="text-white">No Account Required:</strong> You don't need to log in, register, or connect a cloud account to use any of the core study tools.
             </li>
             <li>
-              <strong>Large File Support:</strong> IndexedDB natively stores binary blobs (study PDFs) up to several gigabytes without slowing down application memory.
+              <strong className="text-white">Large File Support:</strong> IndexedDB natively stores binary blobs (study PDFs) up to several gigabytes without slowing down application memory.
             </li>
             <li>
-              <strong>Reliable Restart Resilience:</strong> All your progress, questions, doubt flags, and study targets survive closing and reopening the application or browser tab.
+              <strong className="text-white">Reliable Restart Resilience:</strong> All your progress, questions, doubt flags, and study targets survive closing and reopening the application or browser tab.
             </li>
           </ul>
         </div>
@@ -173,19 +173,19 @@ export const Settings: React.FC<SettingsProps> = ({
       {/* Backup and Restore Box */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Export Backup */}
-        <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs flex flex-col justify-between">
+        <div className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] p-6 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center space-x-2 mb-2">
               <Download className="w-5 h-5 text-acca-red" />
-              <h3 className="text-base font-bold text-gray-900">Export Backup</h3>
+              <h3 className="text-base font-bold text-white">Export Backup</h3>
             </div>
-            <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">
               Export your papers progress, questions, doubt flags, and study plans to a structured JSON file. Keep a safe copy or transfer your study data to another device.
             </p>
 
             {backupSuccessMessage && (
-              <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <div className="mb-4 p-3 bg-emerald-950/30 border border-emerald-900/50 rounded-xl text-xs text-emerald-300 flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
                 <span>{backupSuccessMessage}</span>
               </div>
             )}
@@ -193,7 +193,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
           <button
             onClick={handleExportBackup}
-            className="w-full bg-gray-900 hover:bg-black text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-colors"
+            className="w-full bg-acca-red hover:bg-acca-red-dark text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-colors shadow-xs"
           >
             <Download className="w-4 h-4" />
             <span>Download JSON Backup</span>
@@ -201,19 +201,19 @@ export const Settings: React.FC<SettingsProps> = ({
         </div>
 
         {/* Restore Backup */}
-        <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs flex flex-col justify-between">
+        <div className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] p-6 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center space-x-2 mb-2">
               <Upload className="w-5 h-5 text-acca-red" />
-              <h3 className="text-base font-bold text-gray-900">Restore from Backup</h3>
+              <h3 className="text-base font-bold text-white">Restore from Backup</h3>
             </div>
-            <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">
               Restore previously exported Catchy ACCA backups. Includes schema format validation, pre-import preview, and choice between merging or replacing records.
             </p>
 
             {validationResult && !validationResult.isValid && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-acca-red flex items-center space-x-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
+              <div className="mb-4 p-3 bg-red-950/30 border border-red-900/50 rounded-xl text-xs text-red-300 flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
                 <span>{validationResult.error}</span>
               </div>
             )}
@@ -229,7 +229,7 @@ export const Settings: React.FC<SettingsProps> = ({
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full bg-white border border-gray-300 hover:border-gray-400 text-gray-800 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-colors"
+              className="w-full bg-[#141419] border border-[#374151] hover:bg-[#25252e] text-gray-200 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-colors"
             >
               <FileJson className="w-4 h-4 text-acca-red" />
               <span>Select Backup File (.json)</span>
@@ -239,10 +239,10 @@ export const Settings: React.FC<SettingsProps> = ({
       </div>
 
       {/* Optional Sample Practice Data */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-bold text-gray-900">Optional: Load Starter Practice Sample Data</h3>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <h3 className="text-sm font-bold text-white">Optional: Load Starter Practice Sample Data</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
             Want to test the CBE simulator and spreadsheet workspaces before importing your own PDFs? You can optionally populate sample practice items.
           </p>
         </div>
@@ -255,27 +255,27 @@ export const Settings: React.FC<SettingsProps> = ({
               alert('Sample practice data loaded successfully!');
             }
           }}
-          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold shrink-0 transition-colors"
+          className="px-4 py-2 bg-[#141419] hover:bg-[#25252e] border border-[#374151] text-gray-200 rounded-xl text-xs font-bold shrink-0 transition-colors"
         >
           Load Starter Practice Data
         </button>
       </div>
 
       {/* AI Assistance & Provider Architecture Card */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs space-y-5">
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+      <div className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] p-6 shadow-xs space-y-5">
+        <div className="flex items-center justify-between pb-3 border-b border-[#2a2a34]">
           <div className="flex items-center space-x-2">
             <Bot className="w-5 h-5 text-acca-red" />
             <div>
-              <h2 className="text-base font-bold text-gray-900">
+              <h2 className="text-base font-bold text-white">
                 AI Assistance & Provider Configuration (Strictly Optional)
               </h2>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-400">
                 Core ACCA tracking, question bank, CBE exams, and workings grids remain 100% offline without any AI connection.
               </p>
             </div>
           </div>
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-950/40 text-emerald-300 border border-emerald-800/50">
             {aiConfig.provider === 'offline_local' ? 'Offline-First Active' : 'External Config'}
           </span>
         </div>
@@ -285,14 +285,14 @@ export const Settings: React.FC<SettingsProps> = ({
           <div
             className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
               aiStatusMessage.success
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                : 'bg-red-50 border-red-200 text-red-800'
+                ? 'bg-emerald-950/30 border-emerald-900/50 text-emerald-300'
+                : 'bg-red-950/30 border-red-900/50 text-red-300'
             }`}
           >
             {aiStatusMessage.success ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             ) : (
-              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
             )}
             <span>{aiStatusMessage.text}</span>
           </div>
@@ -301,7 +301,7 @@ export const Settings: React.FC<SettingsProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Provider Selection */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-700">AI Provider Layer</label>
+            <label className="text-xs font-bold text-gray-300">AI Provider Layer</label>
             <select
               value={aiConfig.provider}
               onChange={(e) => {
@@ -318,7 +318,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   modelName: defaultModel,
                 }));
               }}
-              className="w-full text-xs font-medium border border-gray-300 rounded-xl px-3 py-2.5 bg-white text-gray-800 outline-none focus:border-acca-red"
+              className="w-full text-xs font-medium border border-[#374151] rounded-xl px-3 py-2.5 bg-[#141419] text-gray-100 outline-none focus:border-acca-red"
             >
               <option value="offline_local">Built-in Offline Engine (Private, Zero Network, No Key)</option>
               <option value="ollama">Local Ollama (Local Network, Private, http://localhost:11434)</option>
@@ -330,27 +330,27 @@ export const Settings: React.FC<SettingsProps> = ({
 
           {/* Model Name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-700">Target Model Identifier</label>
+            <label className="text-xs font-bold text-gray-300">Target Model Identifier</label>
             <input
               type="text"
               value={aiConfig.modelName}
               onChange={(e) => setAiConfig((prev) => ({ ...prev, modelName: e.target.value }))}
               placeholder="e.g. gpt-4o-mini or llama3.2"
               disabled={aiConfig.provider === 'offline_local'}
-              className="w-full text-xs border border-gray-300 rounded-xl px-3 py-2.5 bg-white disabled:bg-gray-100 text-gray-800 outline-none focus:border-acca-red"
+              className="w-full text-xs border border-[#374151] rounded-xl px-3 py-2.5 bg-[#141419] disabled:bg-[#1f1f27] disabled:text-gray-500 text-gray-100 outline-none focus:border-acca-red"
             />
           </div>
 
           {/* Ollama Endpoint (if ollama) */}
           {aiConfig.provider === 'ollama' && (
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-xs font-bold text-gray-700">Ollama Host URL</label>
+              <label className="text-xs font-bold text-gray-300">Ollama Host URL</label>
               <input
                 type="text"
                 value={aiConfig.endpointUrl || 'http://localhost:11434'}
                 onChange={(e) => setAiConfig((prev) => ({ ...prev, endpointUrl: e.target.value }))}
                 placeholder="http://localhost:11434"
-                className="w-full text-xs border border-gray-300 rounded-xl px-3 py-2.5 bg-white text-gray-800 outline-none focus:border-acca-red font-mono"
+                className="w-full text-xs border border-[#374151] rounded-xl px-3 py-2.5 bg-[#141419] text-gray-100 outline-none focus:border-acca-red font-mono"
               />
             </div>
           )}
@@ -358,24 +358,24 @@ export const Settings: React.FC<SettingsProps> = ({
           {/* API Key (if cloud provider) */}
           {aiConfig.provider !== 'offline_local' && aiConfig.provider !== 'ollama' && (
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-xs font-bold text-gray-700">Provider API Key (BYOK)</label>
+              <label className="text-xs font-bold text-gray-300">Provider API Key (BYOK)</label>
               <div className="relative">
                 <input
                   type={showApiKey ? 'text' : 'password'}
                   value={aiConfig.apiKey || ''}
                   onChange={(e) => setAiConfig((prev) => ({ ...prev, apiKey: e.target.value }))}
                   placeholder="Paste your private API key here..."
-                  className="w-full text-xs border border-gray-300 rounded-xl pl-3 pr-10 py-2.5 bg-white text-gray-800 outline-none focus:border-acca-red font-mono"
+                  className="w-full text-xs border border-[#374151] rounded-xl pl-3 pr-10 py-2.5 bg-[#141419] text-gray-100 outline-none focus:border-acca-red font-mono"
                 />
                 <button
                   type="button"
                   onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-200"
                 >
                   {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-[11px] text-gray-500">
+              <p className="text-[11px] text-gray-400">
                 Your key is stored strictly on your computer (in browser localStorage) and is never transmitted to Catchy ACCA servers.
               </p>
             </div>
@@ -384,18 +384,18 @@ export const Settings: React.FC<SettingsProps> = ({
 
         {/* User Consent Checkbox (Enforced by safety boundary) */}
         {aiConfig.provider !== 'offline_local' && (
-          <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-2">
-            <label className="flex items-start gap-2.5 cursor-pointer text-xs text-amber-900 select-none">
+          <div className="p-3.5 bg-amber-950/20 border border-amber-900/40 rounded-xl space-y-2">
+            <label className="flex items-start gap-2.5 cursor-pointer text-xs text-amber-300 select-none">
               <input
                 type="checkbox"
                 checked={aiConfig.hasUserConsent}
                 onChange={(e) =>
                   setAiConfig((prev) => ({ ...prev, hasUserConsent: e.target.checked }))
                 }
-                className="mt-0.5 rounded border-amber-300 text-acca-red focus:ring-acca-red"
+                className="mt-0.5 rounded border-[#374151] text-acca-red focus:ring-acca-red"
               />
               <span className="leading-relaxed">
-                <strong>Explicit External Transmission Consent:</strong> I understand that selecting a remote provider ({aiConfig.provider}) will transmit my question queries over the internet to that external provider. My local study PDFs and offline database remain strictly on my computer.
+                <strong className="text-amber-200">Explicit External Transmission Consent:</strong> I understand that selecting a remote provider ({aiConfig.provider}) will transmit my question queries over the internet to that external provider. My local study PDFs and offline database remain strictly on my computer.
               </span>
             </label>
           </div>
@@ -411,7 +411,7 @@ export const Settings: React.FC<SettingsProps> = ({
               setAiStatusMessage({ success: true, text: 'Reset to Built-in Offline Engine.' });
               setTimeout(() => setAiStatusMessage(null), 3000);
             }}
-            className="text-xs text-gray-500 hover:text-gray-800 underline"
+            className="text-xs text-gray-400 hover:text-white underline transition-colors"
           >
             Reset to Built-in Offline Engine
           </button>
@@ -427,7 +427,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 setAiStatusMessage({ success: res.success, text: res.message });
                 setIsTestingAi(false);
               }}
-              className="px-3.5 py-2 border border-gray-300 hover:bg-gray-50 rounded-xl text-xs font-semibold text-gray-700 transition-colors"
+              className="px-3.5 py-2 border border-[#374151] hover:bg-[#25252e] rounded-xl text-xs font-semibold text-gray-300 transition-colors"
             >
               {isTestingAi ? 'Testing Connection...' : 'Test Connection'}
             </button>
@@ -439,7 +439,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 setAiStatusMessage({ success: true, text: 'AI configuration saved successfully!' });
                 setTimeout(() => setAiStatusMessage(null), 3000);
               }}
-              className="px-4 py-2 bg-neutral-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-colors shadow-2xs"
+              className="px-4 py-2 bg-acca-red hover:bg-acca-red-dark text-white rounded-xl text-xs font-bold transition-colors shadow-2xs"
             >
               Save AI Configuration
             </button>
@@ -448,27 +448,27 @@ export const Settings: React.FC<SettingsProps> = ({
       </div>
 
       {/* Setup Wizard Re-run */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+      <div className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-[#2a2a34]">
           <div className="flex items-center space-x-2">
             <Sparkles className="w-5 h-5 text-acca-red" />
-            <h2 className="text-base font-bold text-gray-900">
+            <h2 className="text-base font-bold text-white">
               Workspace Onboarding & Setup Wizard
             </h2>
           </div>
-          <span className="text-xs font-semibold text-gray-500">
+          <span className="text-xs font-semibold text-gray-400">
             Setup Assistance
           </span>
         </div>
 
-        <p className="text-xs text-gray-600 leading-relaxed">
+        <p className="text-xs text-gray-300 leading-relaxed">
           Revisit the 8-step onboarding wizard to adjust your display name, current qualification stage, target paper, or intended exam sitting.
         </p>
 
-        <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/70 rounded-xl text-xs text-emerald-800 flex items-center space-x-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div className="p-3.5 bg-emerald-950/20 border border-emerald-900/40 rounded-xl text-xs text-emerald-300 flex items-center space-x-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>
-            <strong>Safe execution guarantee:</strong> Re-running setup will <em>never</em> overwrite, reset, or delete your existing study notes, study materials, checklists, or answers.
+            <strong className="text-emerald-200">Safe execution guarantee:</strong> Re-running setup will <em>never</em> overwrite, reset, or delete your existing study notes, study materials, checklists, or answers.
           </span>
         </div>
 
@@ -480,7 +480,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 onRestartOnboarding();
               }
             }}
-            className="px-4 py-2 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-colors inline-flex items-center space-x-2"
+            className="px-4 py-2 bg-[#141419] hover:bg-[#25252e] border border-[#374151] text-white rounded-xl text-xs font-bold transition-colors inline-flex items-center space-x-2"
           >
             <Sparkles className="w-3.5 h-3.5 text-acca-red" />
             <span>Restart Setup Wizard</span>
@@ -489,52 +489,67 @@ export const Settings: React.FC<SettingsProps> = ({
       </div>
 
       {/* Attribution & Dependency / License Inventory */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+      <div className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-[#2a2a34]">
           <div className="flex items-center space-x-2">
             <ShieldCheck className="w-5 h-5 text-acca-red" />
-            <h2 className="text-base font-bold text-gray-900">
+            <h2 className="text-base font-bold text-white">
               Licensing & Open Source Inventory
             </h2>
           </div>
-          <span className="text-xs font-semibold text-gray-500">
+          <span className="text-xs font-semibold text-gray-400">
             Catchy ACCA · by ly77ee
           </span>
         </div>
 
-        <p className="text-xs text-gray-600 leading-relaxed">
-          Catchy ACCA is an open-source educational study tool. Built strictly with modern, maintained, permissive MIT/Apache 2.0 open-source libraries:
+        <p className="text-xs text-gray-300 leading-relaxed">
+          Catchy ACCA is an open-source, local-first ACCA study workspace published under the GNU General Public License v3.0 (GPL-3.0-only). Built strictly with modern, maintained, permissive open-source libraries:
         </p>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-          <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/60">
-            <span className="font-bold text-gray-900 block">React 18</span>
-            <span className="text-[11px] text-gray-500">MIT License • UI Runtime</span>
-          </div>
-          <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/60">
-            <span className="font-bold text-gray-900 block">TypeScript</span>
-            <span className="text-[11px] text-gray-500">Apache 2.0 • Type Safety</span>
-          </div>
-          <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/60">
-            <span className="font-bold text-gray-900 block">Dexie.js</span>
-            <span className="text-[11px] text-gray-500">Apache 2.0 • IndexedDB Engine</span>
-          </div>
-          <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/60">
-            <span className="font-bold text-gray-900 block">PDF.js</span>
-            <span className="text-[11px] text-gray-500">Apache 2.0 • Local PDF Rendering</span>
-          </div>
-          <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/60">
-            <span className="font-bold text-gray-900 block">Tailwind CSS</span>
-            <span className="text-[11px] text-gray-500">MIT License • Design System</span>
-          </div>
-          <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/60">
-            <span className="font-bold text-gray-900 block">Lucide Icons</span>
-            <span className="text-[11px] text-gray-500">ISC License • Minimalist Icons</span>
+        {/* Primary Project License Box */}
+        <div className="p-4 bg-red-950/20 border border-red-900/40 rounded-xl flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="font-extrabold text-sm text-white">Catchy ACCA · Core Application</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-acca-red bg-red-950/60 border border-red-800/50 px-2 py-0.5 rounded">
+                GPL-3.0-only
+              </span>
+            </div>
+            <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+              Licensed under the <strong>GNU General Public License v3.0</strong>. Copyright © 2026 ly77ee. Free to run, study, share, and improve under copyleft terms.
+            </p>
           </div>
         </div>
 
-        <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-[11px] text-gray-500 leading-relaxed">
-          <strong>Important ACCA Disclaimer:</strong> Catchy ACCA is not affiliated with, endorsed by, or associated with the Association of Chartered Certified Accountants (ACCA). All ACCA qualifications, paper names, and trademarks belong to ACCA. No proprietary publisher question banks (Kaplan, BPP) are distributed with this software.
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+          <div className="p-3 bg-[#141419] rounded-xl border border-[#2a2a34]">
+            <span className="font-bold text-white block">React 18</span>
+            <span className="text-[11px] text-gray-400">MIT License • UI Runtime</span>
+          </div>
+          <div className="p-3 bg-[#141419] rounded-xl border border-[#2a2a34]">
+            <span className="font-bold text-white block">TypeScript</span>
+            <span className="text-[11px] text-gray-400">Apache 2.0 • Type Safety</span>
+          </div>
+          <div className="p-3 bg-[#141419] rounded-xl border border-[#2a2a34]">
+            <span className="font-bold text-white block">Dexie.js</span>
+            <span className="text-[11px] text-gray-400">Apache 2.0 • IndexedDB Engine</span>
+          </div>
+          <div className="p-3 bg-[#141419] rounded-xl border border-[#2a2a34]">
+            <span className="font-bold text-white block">PDF.js</span>
+            <span className="text-[11px] text-gray-400">Apache 2.0 • Local PDF Rendering</span>
+          </div>
+          <div className="p-3 bg-[#141419] rounded-xl border border-[#2a2a34]">
+            <span className="font-bold text-white block">Tailwind CSS</span>
+            <span className="text-[11px] text-gray-400">MIT License • Design System</span>
+          </div>
+          <div className="p-3 bg-[#141419] rounded-xl border border-[#2a2a34]">
+            <span className="font-bold text-white block">Lucide Icons</span>
+            <span className="text-[11px] text-gray-400">ISC License • Minimalist Icons</span>
+          </div>
+        </div>
+
+        <div className="p-4 bg-[#141419] rounded-xl border border-[#2a2a34] text-[11px] text-gray-400 leading-relaxed">
+          <strong className="text-gray-300">Important ACCA Disclaimer:</strong> Catchy ACCA is not affiliated with, endorsed by, or associated with the Association of Chartered Certified Accountants (ACCA). All ACCA qualifications, paper names, and trademarks belong to ACCA. No proprietary publisher question banks (Kaplan, BPP) are distributed with this software.
         </div>
       </div>
 
@@ -545,39 +560,39 @@ export const Settings: React.FC<SettingsProps> = ({
         title="Confirm Backup Restoration"
       >
         <div className="space-y-4">
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-300">
             The backup file has been validated successfully. Review the contents below before proceeding:
           </p>
 
           {validationResult?.summary && (
-            <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs space-y-1.5">
+            <div className="bg-[#141419] p-3.5 rounded-xl border border-[#2a2a34] text-xs space-y-1.5">
               <div className="flex justify-between">
-                <span className="text-gray-500">Exported At:</span>
-                <span className="font-semibold text-gray-900">
+                <span className="text-gray-400">Exported At:</span>
+                <span className="font-semibold text-white">
                   {new Date(validationResult.summary.exportedAt).toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Paper Records:</span>
-                <span className="font-semibold text-gray-900">{validationResult.summary.papersCount} papers</span>
+                <span className="text-gray-400">Paper Records:</span>
+                <span className="font-semibold text-white">{validationResult.summary.papersCount} papers</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Question Records:</span>
-                <span className="font-semibold text-gray-900">{validationResult.summary.questionsCount} questions</span>
+                <span className="text-gray-400">Question Records:</span>
+                <span className="font-semibold text-white">{validationResult.summary.questionsCount} questions</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Study Plan Items:</span>
-                <span className="font-semibold text-gray-900">{validationResult.summary.plansCount} items</span>
+                <span className="text-gray-400">Study Plan Items:</span>
+                <span className="font-semibold text-white">{validationResult.summary.plansCount} items</span>
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+            <label className="block text-xs font-bold text-gray-300 uppercase mb-1">
               Restoration Mode
             </label>
             <div className="space-y-2">
-              <label className="flex items-center space-x-2 text-xs text-gray-800 cursor-pointer">
+              <label className="flex items-center space-x-2 text-xs text-gray-300 cursor-pointer">
                 <input
                   type="radio"
                   name="restoreMode"
@@ -586,9 +601,9 @@ export const Settings: React.FC<SettingsProps> = ({
                   onChange={() => setRestoreMode('merge')}
                   className="text-acca-red focus:ring-acca-red"
                 />
-                <span><strong>Safe Merge (Recommended):</strong> Updates existing records and adds new ones without deleting your other entries.</span>
+                <span><strong className="text-white">Safe Merge (Recommended):</strong> Updates existing records and adds new ones without deleting your other entries.</span>
               </label>
-              <label className="flex items-center space-x-2 text-xs text-gray-800 cursor-pointer">
+              <label className="flex items-center space-x-2 text-xs text-gray-300 cursor-pointer">
                 <input
                   type="radio"
                   name="restoreMode"
@@ -597,23 +612,23 @@ export const Settings: React.FC<SettingsProps> = ({
                   onChange={() => setRestoreMode('overwrite')}
                   className="text-acca-red focus:ring-acca-red"
                 />
-                <span><strong>Complete Replace:</strong> Wipes current data and replaces everything with the backup file.</span>
+                <span><strong className="text-white">Complete Replace:</strong> Wipes current data and replaces everything with the backup file.</span>
               </label>
             </div>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4 border-t border-gray-100">
+          <div className="flex justify-end space-x-2 pt-4 border-t border-[#2a2a34]">
             <button
               type="button"
               onClick={() => setIsConfirmModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-xs font-medium text-gray-400 hover:text-white hover:bg-[#25252e] rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleExecuteRestore}
-              className="px-4 py-2 text-xs font-bold text-white bg-acca-red hover:bg-acca-red-dark rounded-lg"
+              className="px-4 py-2 text-xs font-bold text-white bg-acca-red hover:bg-acca-red-dark rounded-lg transition-colors"
             >
               Confirm and Restore
             </button>

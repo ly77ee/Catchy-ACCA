@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Catchy ACCA · Open-source local-first ACCA study workspace",
   "author": "ly77ee",
+  "license": "GPL-3.0-only",
   "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
@@ -14,9 +15,9 @@
     "electron:dev": "electron .",
     "electron:build": "npm run build && electron-builder",
     "electron:build:mac": "npm run build && electron-builder --mac",
-    "electron:build:win": "npm run build && electron-builder --win",
+    "electron:build:win": "npm run build && electron-builder --win --x64",
     "package:mac": "npm run build && electron-builder --mac dmg",
-    "package:win": "npm run build && electron-builder --win nsis"
+    "package:win": "npm run build && electron-builder --win nsis --x64"
   },
   "build": {
     "appId": "com.ly77ee.catchyacca",
@@ -60,7 +61,12 @@
     },
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.ico"
     },
