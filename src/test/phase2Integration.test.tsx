@@ -112,4 +112,64 @@ describe('Phase 2 Exam Simulator & Attempt History Integration', () => {
     expect(result.summary?.attemptsCount).toBe(1);
     expect(result.summary?.papersCount).toBe(1);
   });
+
+  it('updates existing questions without creating duplicates on re-importing the same material', async () => {
+    const now = new Date().toISOString();
+    const materialId = 'mat-reimport-test';
+    const qId = `q-${materialId}-Q1`;
+
+    // 1. Initial import of question
+    const initialQuestion: QuestionRecord = {
+      id: qId,
+      questionNumber: 'Q1',
+      title: 'Initial Title',
+      paperId: 'FR',
+      sourceMaterialId: materialId,
+      sourcePage: 10,
+      topicTags: ['Leases'],
+      questionType: 'section_a_mcq',
+      notes: 'Initial prompt',
+      status: 'attempted',
+      isDoubt: true,
+      confidenceRating: 4,
+      availableMarks: 2,
+      attempts: [
+        {
+          id: 'att-user-1',
+          attemptDate: now,
+          marksAwarded: 2,
+          totalMarks: 2
+        }
+      ],
+      createdAt: now,
+      updatedAt: now
+    };
+
+    await dbInstance.questions.put(initialQuestion);
+    expect(await dbInstance.questions.where('sourceMaterialId').equals(materialId).count()).toBe(1);
+
+    // 2. Simulated re-import with updated text
+    const existing = await dbInstance.questions.get(qId);
+    expect(existing).toBeDefined();
+
+    const reimportedQuestion: QuestionRecord = {
+      ...initialQuestion,
+      title: 'Updated Title from New Scan',
+      status: existing?.status || 'not_started',
+      isDoubt: existing?.isDoubt || false,
+      attempts: existing?.attempts || [],
+      updatedAt: new Date().toISOString()
+    };
+
+    await dbInstance.questions.put(reimportedQuestion);
+
+    // Verify still exactly 1 record (no duplicate) and user state preserved
+    const totalCount = await dbInstance.questions.where('sourceMaterialId').equals(materialId).count();
+    expect(totalCount).toBe(1);
+
+    const updated = await dbInstance.questions.get(qId);
+    expect(updated?.title).toBe('Updated Title from New Scan');
+    expect(updated?.isDoubt).toBe(true);
+    expect(updated?.attempts.length).toBe(1);
+  });
 });

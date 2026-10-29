@@ -11,6 +11,7 @@ import {
   colIndexToLetter,
   formatCellValue,
   recomputeSheet,
+  recomputeWorkbook,
   exportSheetToCsv,
   importCsvToSheet
 } from '../../utils/formulaEngine';
@@ -188,19 +189,17 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
       }
     };
 
-    const recomputed = recomputeSheet({
+    const updatedSheets = [...workbook.sheets];
+    updatedSheets[activeSheetIndex] = {
       ...activeSheet,
       cells: updatedCells
-    });
+    };
 
-    const updatedSheets = [...workbook.sheets];
-    updatedSheets[activeSheetIndex] = recomputed;
-
-    const updatedWb: SpreadsheetWorkbook = {
+    const updatedWb: SpreadsheetWorkbook = recomputeWorkbook({
       ...workbook,
       sheets: updatedSheets,
       updatedAt: new Date().toISOString()
-    };
+    });
 
     setWorkbook(updatedWb);
     await db.spreadsheets.put(updatedWb);

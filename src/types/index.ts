@@ -197,6 +197,7 @@ export interface ExtractedQuestionDraft {
   correctOptionIds: string[];
   availableMarks: number;
   topicSuggestions: string[];
+  subQuestions?: SubQuestion[];
   markingGuide?: string;
   solutionPage?: number;
   matchStatus?: 'verified' | 'high_confidence' | 'needs_review' | 'unmatched';

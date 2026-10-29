@@ -44,206 +44,224 @@ export class CatchyAccaDatabase extends Dexie {
       writtenAnswers: 'id, questionId, paperId, updatedAt',
       spreadsheets: 'id, questionId, paperId, updatedAt'
     });
+
+    // Version 4 adds sourceMaterialId index on questions for fast queries and deduplication
+    this.version(4).stores({
+      questions: 'id, questionNumber, paperId, sourceMaterialId, status, isDoubt, confidenceRating, createdAt, updatedAt'
+    });
   }
 }
 
 export const db = new CatchyAccaDatabase();
 
-// Initial database seeding if empty
+// Clean initialization for fresh users - initializes baseline profile without fake exam passes
 export async function initializeDatabase(): Promise<void> {
-  const paperCount = await db.paperRecords.count();
-  if (paperCount === 0) {
-    const now = new Date().toISOString();
-    // Default initial sample records for an ACCA student
-    const initialPapers: StudentPaperRecord[] = [
-      {
-        paperId: 'BT',
-        status: 'passed',
-        score: 78,
-        examSession: 'December 2025',
-        notes: 'Solid foundation in business structure and IT governance.',
-        updatedAt: now
-      },
-      {
-        paperId: 'MA',
-        status: 'passed',
-        score: 82,
-        examSession: 'December 2025',
-        notes: 'Good score on costing and variance analysis.',
-        updatedAt: now
-      },
-      {
-        paperId: 'FA',
-        status: 'passed',
-        score: 85,
-        examSession: 'January 2026',
-        notes: 'Comfortable with IFRS statements and adjustments.',
-        updatedAt: now
-      },
-      {
-        paperId: 'FR',
-        status: 'in_progress',
-        targetScore: 70,
-        examSession: 'March 2027',
-        targetExamDate: '2027-03-05',
-        notes: 'Currently focusing on Group Financial Statements and Leases (IFRS 16).',
-        updatedAt: now
-      },
-      {
-        paperId: 'PM',
-        status: 'not_started',
-        examSession: 'June 2027',
-        targetScore: 65,
-        notes: 'Planned for June session alongside AA.',
-        updatedAt: now
-      }
-    ];
-
-    await db.paperRecords.bulkPut(initialPapers);
-
-    // Initial student target
+  const targetCount = await db.targets.count();
+  if (targetCount === 0) {
     await db.targets.put({
       id: 'default',
       nextExamPaperId: 'FR',
-      nextExamDate: '2027-03-05',
       targetScore: 70,
       weeklyStudyHours: 15,
-      notes: 'Prepare section C consolidation questions and ethics scenarios.'
+      notes: ''
     });
+  }
+}
 
-    // Sample study plan items for today
-    const today = new Date().toISOString().split('T')[0];
-    await db.studyPlans.bulkPut([
-      {
-        id: 'plan-1',
-        title: 'Review IFRS 16 Leases: Lessee accounting & right-of-use asset',
-        paperId: 'FR',
-        estimatedMinutes: 45,
-        completed: false,
-        dueDate: today,
-        createdAt: now
-      },
-      {
-        id: 'plan-2',
-        title: 'Practise 2 Section B Objective Test Cases on Revenue (IFRS 15)',
-        paperId: 'FR',
-        estimatedMinutes: 60,
-        completed: false,
-        dueDate: today,
-        createdAt: now
-      },
-      {
-        id: 'plan-3',
-        title: 'Log doubts and create question flashcards for Goodwill impairment',
-        paperId: 'FR',
-        estimatedMinutes: 30,
-        completed: true,
-        dueDate: today,
-        createdAt: now
-      }
-    ]);
+// Optional demo/sample data loader for testing the simulator and analytics
+export async function seedSampleDemoData(): Promise<void> {
+  try {
+    const now = new Date().toISOString();
+  // Sample paper progress
+  const samplePapers: StudentPaperRecord[] = [
+    {
+      paperId: 'BT',
+      status: 'passed',
+      score: 78,
+      examSession: 'December 2025',
+      notes: 'Solid foundation in business structure and IT governance.',
+      updatedAt: now
+    },
+    {
+      paperId: 'MA',
+      status: 'passed',
+      score: 82,
+      examSession: 'December 2025',
+      notes: 'Good score on costing and variance analysis.',
+      updatedAt: now
+    },
+    {
+      paperId: 'FA',
+      status: 'passed',
+      score: 85,
+      examSession: 'January 2026',
+      notes: 'Comfortable with IFRS statements and adjustments.',
+      updatedAt: now
+    },
+    {
+      paperId: 'FR',
+      status: 'in_progress',
+      targetScore: 70,
+      examSession: 'March 2027',
+      targetExamDate: '2027-03-05',
+      notes: 'Currently focusing on Group Financial Statements and Leases (IFRS 16).',
+      updatedAt: now
+    },
+    {
+      paperId: 'PM',
+      status: 'not_started',
+      examSession: 'June 2027',
+      targetScore: 65,
+      notes: 'Planned for June session alongside AA.',
+      updatedAt: now
+    }
+  ];
 
-    // Seed questions with objective options for simulator testing
-    await db.questions.bulkPut([
-      {
-        id: 'q-seed-1',
-        questionNumber: 'FR-Q1',
-        title: 'Consolidated Statement of Financial Position — Goodwill and NCI',
-        paperId: 'FR',
-        topicTags: ['Consolidation', 'Goodwill', 'NCI', 'IFRS 3'],
-        questionType: 'section_c_constructed',
-        notes: 'Remember to check fair value adjustments to net assets at acquisition date before calculating goodwill.',
-        status: 'attempted',
-        isDoubt: true,
-        confidenceRating: 3,
-        availableMarks: 20,
-        markingGuide: 'Goodwill: Consideration transferred + Fair value of NCI - Net identifiable assets acquired at fair value. Ensure unrealized profit in inventory (PUP) is eliminated.',
-        attempts: [
-          {
-            id: 'att-1',
-            attemptDate: now,
-            marksAwarded: 14,
-            totalMarks: 20,
-            timeSpentSeconds: 2100,
-            remarks: 'Lost marks on intra-group trading unrealized profit (PUP).'
-          }
-        ],
-        createdAt: now,
-        updatedAt: now
-      },
-      {
-        id: 'q-seed-2',
-        questionNumber: 'FR-Q2',
-        title: 'IFRS 16 Leases: Recognition of Lease Liability and ROU Asset',
-        paperId: 'FR',
-        topicTags: ['Leases', 'IFRS 16'],
-        questionType: 'section_a_mcq',
-        notes: 'Initial measurement of lease liability is the present value of lease payments discounted at implicit rate.',
-        status: 'completed',
-        isDoubt: false,
-        confidenceRating: 4,
-        availableMarks: 2,
-        options: [
-          { id: 'A', label: 'A', text: 'Fair value of the underlying asset at the commencement date' },
-          { id: 'B', label: 'B', text: 'Present value of the lease payments not paid at that date, discounted using the interest rate implicit in the lease' },
-          { id: 'C', label: 'C', text: 'Total undiscounted contractual lease payments payable over the term' },
-          { id: 'D', label: 'D', text: 'Historical cost of the asset minus residual scrap value' }
-        ],
-        correctOptionIds: ['B'],
-        markingGuide: 'Under IFRS 16 paragraph 26, at the commencement date, a lessee measures the lease liability at the present value of the lease payments that are not paid at that date.',
-        attempts: [],
-        createdAt: now,
-        updatedAt: now
-      },
-      {
-        id: 'q-seed-3',
-        questionNumber: 'FR-Q3',
-        title: 'IAS 36 Impairment of Assets: Recoverable Amount Definition',
-        paperId: 'FR',
-        topicTags: ['Impairment', 'IAS 36'],
-        questionType: 'section_a_mcq',
-        notes: 'Higher of fair value less costs of disposal and value in use.',
-        status: 'not_started',
-        isDoubt: false,
-        confidenceRating: 5,
-        availableMarks: 2,
-        options: [
-          { id: 'A', label: 'A', text: 'Lower of net realizable value and replacement cost' },
-          { id: 'B', label: 'B', text: 'Higher of fair value less costs of disposal and value in use' },
-          { id: 'C', label: 'C', text: 'Average of carrying amount and liquidation value' },
-          { id: 'D', label: 'D', text: 'Discounted future cash flows minus initial capital cost' }
-        ],
-        correctOptionIds: ['B'],
-        markingGuide: 'Under IAS 36 paragraph 18, recoverable amount is the higher of an asset’s or cash-generating unit’s fair value less costs of disposal and its value in use.',
-        attempts: [],
-        createdAt: now,
-        updatedAt: now
-      },
-      {
-        id: 'q-seed-4',
-        questionNumber: 'FR-Q4',
-        title: 'IFRS 15 Revenue: 5-Step Model Verification',
-        paperId: 'FR',
-        topicTags: ['Revenue', 'IFRS 15'],
-        questionType: 'section_a_mcq',
-        notes: 'Step 2 is identify performance obligations; Step 4 is allocate transaction price.',
-        status: 'not_started',
-        isDoubt: true,
-        confidenceRating: 3,
-        availableMarks: 2,
-        options: [
-          { id: 'A', label: 'A', text: '1: Identify contract; 2: Identify performance obligations; 3: Determine transaction price; 4: Allocate price; 5: Recognize revenue' },
-          { id: 'B', label: 'B', text: '1: Deliver goods; 2: Invoice client; 3: Receive payment; 4: Recognize profit; 5: File tax return' },
-          { id: 'C', label: 'C', text: '1: Draft sales contract; 2: Accrue estimated margin; 3: Deliver goods; 4: Recognize revenue' },
-          { id: 'D', label: 'D', text: '1: Determine price; 2: Issue credit memo; 3: Recognize cash flow' }
-        ],
-        correctOptionIds: ['A'],
-        markingGuide: 'IFRS 15 Core 5-step model: (1) Identify contract, (2) Identify performance obligations, (3) Determine transaction price, (4) Allocate transaction price, (5) Recognize revenue when obligation satisfied.',
-        attempts: [],
-        createdAt: now,
-        updatedAt: now
-      }
-    ]);
+  await db.paperRecords.bulkPut(samplePapers);
+
+  // Sample student target
+  await db.targets.put({
+    id: 'default',
+    nextExamPaperId: 'FR',
+    nextExamDate: '2027-03-05',
+    targetScore: 70,
+    weeklyStudyHours: 15,
+    notes: 'Prepare section C consolidation questions and ethics scenarios.'
+  });
+
+  // Sample study plan items for today
+  const today = new Date().toISOString().split('T')[0];
+  await db.studyPlans.bulkPut([
+    {
+      id: 'plan-1',
+      title: 'Review IFRS 16 Leases: Lessee accounting & right-of-use asset',
+      paperId: 'FR',
+      estimatedMinutes: 45,
+      completed: false,
+      dueDate: today,
+      createdAt: now
+    },
+    {
+      id: 'plan-2',
+      title: 'Practise 2 Section B Objective Test Cases on Revenue (IFRS 15)',
+      paperId: 'FR',
+      estimatedMinutes: 60,
+      completed: false,
+      dueDate: today,
+      createdAt: now
+    },
+    {
+      id: 'plan-3',
+      title: 'Log doubts and create question flashcards for Goodwill impairment',
+      paperId: 'FR',
+      estimatedMinutes: 30,
+      completed: true,
+      dueDate: today,
+      createdAt: now
+    }
+  ]);
+
+  // Seed questions with objective options for simulator testing
+  await db.questions.bulkPut([
+    {
+      id: 'q-seed-1',
+      questionNumber: 'FR-Q1',
+      title: 'Consolidated Statement of Financial Position — Goodwill and NCI',
+      paperId: 'FR',
+      topicTags: ['Consolidation', 'Goodwill', 'NCI', 'IFRS 3'],
+      questionType: 'section_c_constructed',
+      notes: 'Remember to check fair value adjustments to net assets at acquisition date before calculating goodwill.',
+      status: 'attempted',
+      isDoubt: true,
+      confidenceRating: 3,
+      availableMarks: 20,
+      markingGuide: 'Goodwill: Consideration transferred + Fair value of NCI - Net identifiable assets acquired at fair value. Ensure unrealized profit in inventory (PUP) is eliminated.',
+      attempts: [
+        {
+          id: 'att-1',
+          attemptDate: now,
+          marksAwarded: 14,
+          totalMarks: 20,
+          timeSpentSeconds: 2100,
+          remarks: 'Lost marks on intra-group trading unrealized profit (PUP).'
+        }
+      ],
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'q-seed-2',
+      questionNumber: 'FR-Q2',
+      title: 'IFRS 16 Leases: Recognition of Lease Liability and ROU Asset',
+      paperId: 'FR',
+      topicTags: ['Leases', 'IFRS 16'],
+      questionType: 'section_a_mcq',
+      notes: 'Initial measurement of lease liability is the present value of lease payments discounted at implicit rate.',
+      status: 'completed',
+      isDoubt: false,
+      confidenceRating: 4,
+      availableMarks: 2,
+      options: [
+        { id: 'A', label: 'A', text: 'Fair value of the underlying asset at the commencement date' },
+        { id: 'B', label: 'B', text: 'Present value of the lease payments not paid at that date, discounted using the interest rate implicit in the lease' },
+        { id: 'C', label: 'C', text: 'Total undiscounted contractual lease payments payable over the term' },
+        { id: 'D', label: 'D', text: 'Historical cost of the asset minus residual scrap value' }
+      ],
+      correctOptionIds: ['B'],
+      markingGuide: 'Under IFRS 16 paragraph 26, at the commencement date, a lessee measures the lease liability at the present value of the lease payments that are not paid at that date.',
+      attempts: [],
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'q-seed-3',
+      questionNumber: 'FR-Q3',
+      title: 'IAS 36 Impairment of Assets: Recoverable Amount Definition',
+      paperId: 'FR',
+      topicTags: ['Impairment', 'IAS 36'],
+      questionType: 'section_a_mcq',
+      notes: 'Higher of fair value less costs of disposal and value in use.',
+      status: 'not_started',
+      isDoubt: false,
+      confidenceRating: 5,
+      availableMarks: 2,
+      options: [
+        { id: 'A', label: 'A', text: 'Lower of net realizable value and replacement cost' },
+        { id: 'B', label: 'B', text: 'Higher of fair value less costs of disposal and value in use' },
+        { id: 'C', label: 'C', text: 'Average of carrying amount and liquidation value' },
+        { id: 'D', label: 'D', text: 'Discounted future cash flows minus initial capital cost' }
+      ],
+      correctOptionIds: ['B'],
+      markingGuide: 'Under IAS 36 paragraph 18, recoverable amount is the higher of an asset’s or cash-generating unit’s fair value less costs of disposal and its value in use.',
+      attempts: [],
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'q-seed-4',
+      questionNumber: 'FR-Q4',
+      title: 'IFRS 15 Revenue: 5-Step Model Verification',
+      paperId: 'FR',
+      topicTags: ['Revenue', 'IFRS 15'],
+      questionType: 'section_a_mcq',
+      notes: 'Step 2 is identify performance obligations; Step 4 is allocate transaction price.',
+      status: 'not_started',
+      isDoubt: true,
+      confidenceRating: 3,
+      availableMarks: 2,
+      options: [
+        { id: 'A', label: 'A', text: '1: Identify contract; 2: Identify performance obligations; 3: Determine transaction price; 4: Allocate price; 5: Recognize revenue' },
+        { id: 'B', label: 'B', text: '1: Deliver goods; 2: Invoice client; 3: Receive payment; 4: Recognize profit; 5: File tax return' },
+        { id: 'C', label: 'C', text: '1: Draft sales contract; 2: Accrue estimated margin; 3: Deliver goods; 4: Recognize revenue' },
+        { id: 'D', label: 'D', text: '1: Determine price; 2: Issue credit memo; 3: Recognize cash flow' }
+      ],
+      correctOptionIds: ['A'],
+      markingGuide: 'IFRS 15 Core 5-step model: (1) Identify contract, (2) Identify performance obligations, (3) Determine transaction price, (4) Allocate transaction price, (5) Recognize revenue when obligation satisfied.',
+      attempts: [],
+      createdAt: now,
+      updatedAt: now
+    }
+  ]);
 
     // Seed initial starter written answer
     await db.writtenAnswers.put({
@@ -263,10 +281,12 @@ export async function initializeDatabase(): Promise<void> {
     await db.activityLogs.put({
       id: 'act-1',
       timestamp: now,
-      title: 'Workspace Initialized',
-      description: 'Catchy ACCA profile created with initial progress, study plan, starter questions, and workspaces.',
+      title: 'Sample Data Initialized',
+      description: 'Catchy ACCA profile populated with practice sample questions, study plan, and starter workspace.',
       category: 'paper'
     });
+  } catch (err) {
+    console.warn('Sample data seed warning:', err);
   }
 }
 

@@ -158,13 +158,17 @@ describe('Spreadsheet Formula Engine & Financial Calculations', () => {
     expect(evaluateFormula('=COUNTA(A1:A5)', cells)).toBe(4);
   });
 
-  it('evaluates loan payment PMT, PV, and FV financial functions', () => {
+  it('evaluates loan payment PMT, PV, and FV financial functions matching Excel sign convention', () => {
     const cells: Record<string, CellData> = {};
 
     // PMT: $10,000 loan at 8% annual (0.08) over 5 years
-    // Official Excel: PMT(0.08, 5, 10000) = -2504.56
-    const pmt = evaluateFormula('=PMT(0.08, 5, 10000)', cells);
-    expect(pmt).toBe(2504.56);
+    // Official Excel: PMT(0.08, 5, 10000) = -2504.56 (cash outflow)
+    const pmtLoan = evaluateFormula('=PMT(0.08, 5, 10000)', cells);
+    expect(pmtLoan).toBe(-2504.56);
+
+    // PMT: Investing -$10,000 at 8% annual over 5 years returns positive +2504.56 annuity
+    const pmtInvestment = evaluateFormula('=PMT(0.08, 5, -10000)', cells);
+    expect(pmtInvestment).toBe(2504.56);
 
     // PV: 5% discount rate, 5 periods, -100 payment per period
     // PV = ~432.95
@@ -175,6 +179,35 @@ describe('Spreadsheet Formula Engine & Financial Calculations', () => {
     // FV = ~552.56
     const fv = evaluateFormula('=FV(0.05, 5, -100)', cells);
     expect(fv).toBe(552.56);
+  });
+
+  it('propagates cell calculation errors through SUM, AVERAGE, and expressions', () => {
+    const cells: Record<string, CellData> = {
+      A1: { raw: '100' },
+      A2: { raw: '=A1 / 0', computed: '#DIV/0!' },
+      A3: { raw: '50' }
+    };
+
+    expect(evaluateFormula('=SUM(A1:A3)', cells)).toBe('#DIV/0!');
+    expect(evaluateFormula('=AVERAGE(A1:A3)', cells)).toBe('#DIV/0!');
+    expect(evaluateFormula('=A1 + A2', cells)).toBe('#DIV/0!');
+  });
+
+  it('handles absolute cell references like $A$1 and mixed references', () => {
+    const cells: Record<string, CellData> = {
+      A1: { raw: '200' },
+      B1: { raw: '50' }
+    };
+
+    expect(evaluateFormula('=$A$1 + $B$1', cells)).toBe(250);
+    expect(evaluateFormula('=A$1 * $B1', cells)).toBe(10000);
+  });
+
+  it('surfaces #NUM! for IRR failure to converge or invalid cash flows', () => {
+    // All positive cash flows -> no IRR possible -> #NUM!
+    expect(calculateIRR([100, 200, 300])).toBe('#NUM!');
+    // Single cash flow -> #NUM!
+    expect(calculateIRR([-100])).toBe('#NUM!');
   });
 
   it('evaluates cross-sheet references and recomputes multi-sheet workbooks', () => {

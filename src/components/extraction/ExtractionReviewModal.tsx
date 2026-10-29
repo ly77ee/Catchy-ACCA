@@ -140,32 +140,50 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
 
     try {
       const now = new Date().toISOString();
-      const recordsToInsert: QuestionRecord[] = approvedDrafts.map((d, idx) => ({
-        id: 'q-ext-' + Date.now() + '-' + idx,
-        questionNumber: d.questionNumber,
-        title: d.title,
-        paperId: d.paperId,
-        sourceMaterialId: d.sourceMaterialId,
-        sourcePage: d.sourcePageStart,
-        sourcePageEnd: d.sourcePageEnd,
-        topicTags: d.topicSuggestions,
-        questionType: d.questionType,
-        notes: d.prompt,
-        status: 'not_started',
-        isDoubt: false,
-        confidenceRating: Math.round(d.confidenceScore * 5) || 3,
-        options: d.options,
-        correctOptionIds: d.correctOptionIds,
-        availableMarks: d.availableMarks,
-        markingGuide: d.markingGuide,
-        solutionPage: d.solutionPage,
-        matchStatus: d.matchStatus || 'verified',
-        extractedFromPdf: true,
-        needsReview: false,
-        attempts: [],
-        createdAt: now,
-        updatedAt: now
-      }));
+      const materialId = approvedDrafts[0]?.sourceMaterialId;
+      let existingMap = new Map<string, QuestionRecord>();
+
+      if (materialId) {
+        const existing = await db.questions
+          .where('sourceMaterialId')
+          .equals(materialId)
+          .toArray();
+        existingMap = new Map(existing.map(q => [q.id, q]));
+      }
+
+      const recordsToInsert: QuestionRecord[] = approvedDrafts.map((d) => {
+        const cleanQNum = d.questionNumber.replace(/[^A-Za-z0-9_-]/g, '_');
+        const id = `q-${d.sourceMaterialId}-${cleanQNum}`;
+        const prev = existingMap.get(id);
+
+        return {
+          id,
+          questionNumber: d.questionNumber,
+          title: d.title,
+          paperId: d.paperId,
+          sourceMaterialId: d.sourceMaterialId,
+          sourcePage: d.sourcePageStart,
+          sourcePageEnd: d.sourcePageEnd,
+          topicTags: d.topicSuggestions,
+          questionType: d.questionType,
+          notes: d.prompt,
+          status: prev ? prev.status : 'not_started',
+          isDoubt: prev ? prev.isDoubt : false,
+          confidenceRating: prev ? prev.confidenceRating : (Math.round(d.confidenceScore * 5) || 3),
+          options: d.options,
+          subQuestions: d.subQuestions,
+          correctOptionIds: d.correctOptionIds,
+          availableMarks: d.availableMarks,
+          markingGuide: d.markingGuide,
+          solutionPage: d.solutionPage,
+          matchStatus: d.matchStatus || 'verified',
+          extractedFromPdf: true,
+          needsReview: false,
+          attempts: prev ? prev.attempts : [],
+          createdAt: prev ? prev.createdAt : now,
+          updatedAt: now,
+        };
+      });
 
       await db.questions.bulkPut(recordsToInsert);
       await logActivity(
@@ -469,6 +487,27 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
                       </div>
                     )}
                   </div>
+
+                  {/* SubQuestions & Mark Breakdown */}
+                  {currentDraft.subQuestions && currentDraft.subQuestions.length > 0 && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-700">
+                        <span>Subquestions & Mark Breakdown ({currentDraft.subQuestions.length})</span>
+                        <span className="text-[11px] text-gray-500 font-normal">Identified structured requirements</span>
+                      </div>
+                      <div className="space-y-2">
+                        {currentDraft.subQuestions.map((sq, sqIdx) => (
+                          <div key={sq.id || sqIdx} className="bg-white border border-gray-200 rounded-lg p-3 text-xs space-y-1">
+                            <div className="flex items-center justify-between font-bold text-gray-800">
+                              <span>Part {sq.label}</span>
+                              {sq.marks && <span className="text-acca-red font-mono">{sq.marks} Marks</span>}
+                            </div>
+                            <p className="text-gray-600 font-mono text-[11px] leading-relaxed">{sq.prompt}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Topic Intelligence Suggestions */}
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">

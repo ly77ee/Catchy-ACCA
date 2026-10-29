@@ -21,7 +21,8 @@ import {
   createBackupPayload,
   validateBackupPayload,
   restoreBackup,
-  RestoreValidationResult
+  RestoreValidationResult,
+  seedSampleDemoData
 } from '../../db';
 import { Modal } from '../common/Modal';
 import { getAIConfig, saveAIConfig, clearAIConfig, testAIConnection } from '../../utils/aiClient';
@@ -233,6 +234,29 @@ export const Settings: React.FC<SettingsProps> = ({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Optional Sample Practice Data */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-bold text-gray-900">Optional: Load Starter Practice Sample Data</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Want to test the CBE simulator and spreadsheet workspaces before importing your own PDFs? You can optionally populate sample practice items.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={async () => {
+            if (confirm('Load sample ACCA practice questions, workings, and study targets?')) {
+              await seedSampleDemoData();
+              onRefreshData();
+              alert('Sample practice data loaded successfully!');
+            }
+          }}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold shrink-0 transition-colors"
+        >
+          Load Starter Practice Data
+        </button>
       </div>
 
       {/* AI Assistance & Provider Architecture Card */}

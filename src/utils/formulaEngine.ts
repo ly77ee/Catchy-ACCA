@@ -248,10 +248,16 @@ function executeFunction(
         const rangeCells = expandRange(arg);
         for (const addr of rangeCells) {
           const val = resolveCellValue(addr, cells, currentCellId, callStack, allSheets);
+          if (typeof val === 'string' && val.startsWith('#')) {
+            throw new Error(val);
+          }
           if (typeof val === 'number' && !isNaN(val)) vals.push(val);
         }
       } else {
         const val = evaluateExpression(arg, cells, currentCellId, callStack, allSheets);
+        if (typeof val === 'string' && val.startsWith('#')) {
+          throw new Error(val);
+        }
         if (typeof val === 'number' && !isNaN(val)) vals.push(val);
       }
     }
@@ -381,16 +387,23 @@ function executeFunction(
     }
 
     case 'PMT': {
-      // Syntax: PMT(rate, nper, pv)
+      // Syntax: PMT(rate, nper, pv, [fv], [type])
+      // Standard Excel convention: PV * (1+r)^n + PMT * (1+r*type) * ((1+r)^n - 1)/r + FV = 0
       if (args.length < 3) return '#VALUE!';
       const rate = evaluateExpression(args[0], cells, currentCellId, callStack, allSheets);
       const nper = evaluateExpression(args[1], cells, currentCellId, callStack, allSheets);
       const pv = evaluateExpression(args[2], cells, currentCellId, callStack, allSheets);
+      const fv = args[3] ? evaluateExpression(args[3], cells, currentCellId, callStack, allSheets) : 0;
+      const type = args[4] ? evaluateExpression(args[4], cells, currentCellId, callStack, allSheets) : 0;
 
-      if (typeof rate !== 'number' || typeof nper !== 'number' || typeof pv !== 'number') return '#VALUE!';
-      if (rate === 0) return -pv / nper;
+      if (typeof rate !== 'number' || typeof nper !== 'number' || typeof pv !== 'number' || typeof fv !== 'number' || typeof type !== 'number') {
+        return '#VALUE!';
+      }
+      if (rate === 0) return -(pv + fv) / nper;
 
-      const pmt = (pv * rate * Math.pow(1 + rate, nper)) / (Math.pow(1 + rate, nper) - 1);
+      const factor = Math.pow(1 + rate, nper);
+      const annuityFactor = (factor - 1) / rate;
+      const pmt = -(pv * factor + fv) / ((1 + rate * (type ? 1 : 0)) * annuityFactor);
       return Math.round(pmt * 100) / 100;
     }
 
@@ -483,7 +496,7 @@ export function calculateIRR(cashFlows: number[], guess: number = 0.1): number |
     rate = newRate;
   }
 
-  return Math.round(rate * 10000) / 10000;
+  return '#NUM!';
 }
 
 /**

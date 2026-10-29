@@ -4,6 +4,7 @@ import {
   ExtractedQuestionDraft,
   QuestionType,
   QuestionOption,
+  SubQuestion,
 } from '../types';
 import { suggestTopicsForContent } from '../config/syllabusTopics';
 
@@ -43,6 +44,25 @@ export interface ExtractedAnswerBlock {
   physicalPage: number;
   markingGuideText?: string;
   optionsKey?: string;
+}
+
+/**
+ * Detects printed page numbers appearing in header or footer lines of a page.
+ */
+export function detectPrintedPageNumber(text: string): number | null {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+
+  // Check last 4 lines (footer) and first 4 lines (header)
+  const candidateLines = lines.slice(-4).concat(lines.slice(0, 4));
+  for (const line of candidateLines) {
+    const match = line.match(/^(?:page\s*)?(\d{1,4})$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > 0 && num < 2000) return num;
+    }
+  }
+  return null;
 }
 
 /**
@@ -90,18 +110,48 @@ export function parseContentsAndIndex(
               printedQuestionPage: printedQPage,
               printedAnswerPage: printedAnsPage,
             });
-
-            // Calculate estimated offset from the first credible entry
-            if (calculatedOffset === 0 && printedQPage <= 50) {
-              calculatedOffset = Math.max(0, pageNum - 2);
-            }
           }
         }
       }
     }
   }
 
-  // Assign estimated physical pages using calculated offset
+  // 1. Try to detect printed page numbers from headers/footers to compute exact physical - printed offset
+  const detectedOffsets: number[] = [];
+  for (const { pageNum, text } of pageTexts) {
+    const printedNum = detectPrintedPageNumber(text);
+    if (printedNum !== null && printedNum > 0 && pageNum >= printedNum) {
+      detectedOffsets.push(pageNum - printedNum);
+    }
+  }
+
+  if (detectedOffsets.length > 0) {
+    const counts: Record<number, number> = {};
+    for (const off of detectedOffsets) counts[off] = (counts[off] || 0) + 1;
+    let bestCount = 0;
+    for (const [off, count] of Object.entries(counts)) {
+      if (count > bestCount) {
+        bestCount = count;
+        calculatedOffset = parseInt(off, 10);
+      }
+    }
+  }
+
+  // 2. Fallback to first mapping location if header/footer not found
+  if (calculatedOffset === 0 && mappings.length > 0) {
+    const firstMapping = mappings[0];
+    for (const { pageNum, text } of pageTexts) {
+      if (text.match(new RegExp(`(?:Question|Q\\.?)\\s*${firstMapping.questionNumber}\\b`, 'i'))) {
+        calculatedOffset = Math.max(0, pageNum - firstMapping.printedQuestionPage);
+        break;
+      }
+    }
+    if (calculatedOffset === 0) {
+      calculatedOffset = Math.max(0, pageTexts.find(p => p.text.toLowerCase().includes('contents'))?.pageNum || 6);
+    }
+  }
+
+  // Assign physical pages using calculated offset
   mappings.forEach((m) => {
     m.physicalQuestionPage = m.printedQuestionPage + calculatedOffset;
     if (m.printedAnswerPage) {
@@ -240,8 +290,48 @@ export async function extractQuestionsFromPdf(
   // Stage 1: Parse Index and Contents tables
   const { mappings: indexMappings, pageOffset } = parseContentsAndIndex(pageTexts);
 
+  // If index or document hints at answer pages outside the currently scanned window, load those answer pages
+  const additionalAnswerPages = new Set<number>();
+  for (const m of indexMappings) {
+    if (m.physicalAnswerPage && m.physicalAnswerPage > endPage && m.physicalAnswerPage <= totalPages) {
+      additionalAnswerPages.add(m.physicalAnswerPage);
+      if (m.physicalAnswerPage + 1 <= totalPages) {
+        additionalAnswerPages.add(m.physicalAnswerPage + 1);
+      }
+    }
+  }
+
+  // If index had no explicit answer pages, probe standard answer divisions in later sections of multi-page kits
+  if (additionalAnswerPages.size === 0 && totalPages > endPage) {
+    const probePages = [
+      Math.floor(totalPages * 0.5),
+      Math.floor(totalPages * 0.7),
+      Math.floor(totalPages * 0.85),
+    ];
+    for (const p of probePages) {
+      if (p > endPage && p <= totalPages) {
+        additionalAnswerPages.add(p);
+      }
+    }
+  }
+
+  // Fetch targeted answer pages asynchronously
+  const allPageTexts = [...pageTexts];
+  for (const p of Array.from(additionalAnswerPages).slice(0, 15)) {
+    try {
+      const page = await doc.getPage(p);
+      const textContent = await page.getTextContent();
+      const pageStrings = textContent.items
+        .map((item: any) => ('str' in item ? item.str : ''))
+        .filter(Boolean);
+      allPageTexts.push({ pageNum: p, text: pageStrings.join(' ') });
+    } catch {
+      // Continue safely if a page read fails
+    }
+  }
+
   // Stage 2: Parse Answer Sections in scanned pages
-  const answerBlocks = extractAnswerSections(pageTexts);
+  const answerBlocks = extractAnswerSections(allPageTexts);
 
   // Stage 3: Parse Questions from page texts
   const extractedDrafts: ExtractedQuestionDraft[] = [];
@@ -262,23 +352,30 @@ export async function extractQuestionsFromPdf(
       if (rawBlock.length < 20) continue;
       foundInPage = true;
 
-      // Handle multi-page questions: check if question continues to next page
+      // Handle multi-page questions: accumulate text across continuation pages
       let endPageNum = pageNum;
-      if (
-        i + 1 < pageTexts.length &&
-        !rawBlock.includes('Answer') &&
-        !rawBlock.includes('Solution') &&
-        rawBlock.length > 300
+      let fullPrompt = rawBlock;
+      let nextIdx = i + 1;
+
+      while (
+        nextIdx < pageTexts.length &&
+        !pageTexts[nextIdx].text.match(/(?:Question|Q\.?)\s*\d+/i) &&
+        !pageTexts[nextIdx].text.toLowerCase().includes('answers to section') &&
+        !pageTexts[nextIdx].text.toLowerCase().includes('suggested solutions') &&
+        fullPrompt.length < 12000
       ) {
-        const nextPage = pageTexts[i + 1];
-        if (!nextPage.text.match(/(?:Question|Q\.?)\s*\d+/i)) {
-          endPageNum = nextPage.pageNum;
+        const nextPage = pageTexts[nextIdx];
+        endPageNum = nextPage.pageNum;
+        fullPrompt = `${fullPrompt}\n\n[Continuation from Page ${nextPage.pageNum}]\n${nextPage.text.trim()}`;
+        nextIdx++;
+        if (nextPage.text.match(/\[\s*\d+\s*marks?\s*\]/i)) {
+          break;
         }
       }
 
       const draft = parseQuestionBlock(
         qNum,
-        rawBlock,
+        fullPrompt,
         material.paperId || 'FR',
         material.id,
         pageNum,
@@ -408,6 +505,33 @@ export function parseQuestionBlock(
     confidenceScore += 0.1;
   }
 
+  // Extract SubQuestions if present: e.g. "(a) Prepare ... [10 marks]", "(b) Explain ... [6 marks]"
+  const subQuestions: SubQuestion[] = [];
+  const subqRegex = /(?:^|\n)\s*(\([a-z]\))\s+([\s\S]*?)(?=(?:\n\s*\([a-z]\))|$)/g;
+  let subMatch: RegExpExecArray | null;
+  while ((subMatch = subqRegex.exec(rawText)) !== null) {
+    const label = subMatch[1];
+    const subText = subMatch[2].trim();
+    if (subText.length > 10) {
+      const subMarksMatch = subText.match(/[\(\[]\s*(\d+)\s*marks?\s*[\)\]]/i);
+      const marks = subMarksMatch ? parseInt(subMarksMatch[1], 10) : undefined;
+      subQuestions.push({
+        id: `sub-${label.replace(/[\(\)]/g, '')}`,
+        label,
+        prompt: subText,
+        marks,
+      });
+    }
+  }
+
+  if (subQuestions.length > 0) {
+    const subMarksSum = subQuestions.reduce((acc, sq) => acc + (sq.marks || 0), 0);
+    if (subMarksSum > 0) {
+      availableMarks = subMarksSum;
+      confidenceScore += 0.15;
+    }
+  }
+
   // Extract Options (A, B, C, D)
   const options: QuestionOption[] = [];
   const lines = rawText.split('\n');
@@ -502,6 +626,7 @@ export function parseQuestionBlock(
     sourceMaterialId: materialId,
     questionType,
     options,
+    subQuestions: subQuestions.length > 0 ? subQuestions : undefined,
     correctOptionIds,
     availableMarks,
     topicSuggestions,
