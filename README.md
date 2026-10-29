@@ -169,6 +169,14 @@ Catchy ACCA is free software released under the **GNU General Public License ver
 
 ---
 
+## 📦 Official Releases & Bug Reports
+
+- **GitHub Repository:** [https://github.com/ly77ee/Catchy-ACCA](https://github.com/ly77ee/Catchy-ACCA)
+- **Official Releases:** Ready-to-use desktop installers (.dmg for macOS, .exe for Windows) can be downloaded directly from [Catchy ACCA Releases](https://github.com/ly77ee/Catchy-ACCA/releases).
+- **Issue Tracking & Feedback:** Found a bug or have a suggestion? Please file an issue on the [GitHub Issue Tracker](https://github.com/ly77ee/Catchy-ACCA/issues).
+
+---
+
 ## 📜 Dependency & License Inventory
 
 Catchy ACCA itself is licensed under **GPL-3.0-only**, and incorporates standard open-source dependencies:
