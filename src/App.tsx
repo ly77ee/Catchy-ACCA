@@ -23,6 +23,8 @@ import { Help } from './components/help/Help';
 import { ComingSoon } from './components/common/ComingSoon';
 import { AIAssistant } from './components/ai/AIAssistant';
 import { RevisionAnalytics } from './components/revision/RevisionAnalytics';
+import { ExamPlanner } from './components/planner/ExamPlanner';
+import { TopicGrouping } from './components/topics/TopicGrouping';
 
 // Icons for Future Modules
 import { FileCheck, Table2, PenTool, TrendingUp, Bot } from 'lucide-react';
@@ -83,10 +85,10 @@ export const App: React.FC = () => {
 
   if (!isDbReady) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-[#141419] flex flex-col items-center justify-center p-4 text-white">
         <div className="w-10 h-10 border-4 border-acca-red border-t-transparent rounded-full animate-spin mb-4" />
-        <h2 className="text-base font-bold text-gray-800">Initializing Catchy ACCA...</h2>
-        <p className="text-xs text-gray-500 mt-1">Preparing local IndexedDB and study data</p>
+        <h2 className="text-base font-bold text-white tracking-tight">Initializing Catchy ACCA...</h2>
+        <p className="text-xs text-gray-400 mt-1">Preparing local IndexedDB and study data</p>
       </div>
     );
   }
@@ -171,7 +173,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Tab: Excel Workspace */}
-      {activeTab === 'excel-workspace' && (
+      {(activeTab === 'excel' || activeTab === 'excel-workspace') && (
         <ConnectedWorkspace
           version={activeVersion}
           allQuestions={questions || []}
@@ -181,8 +183,8 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Tab: Answer Writer */}
-      {activeTab === 'answer-writer' && (
+      {/* Tab: Word Answer Writer */}
+      {(activeTab === 'word' || activeTab === 'answer-writer') && (
         <ConnectedWorkspace
           version={activeVersion}
           allQuestions={questions || []}
@@ -204,7 +206,39 @@ export const App: React.FC = () => {
           }}
           onOpenQuestionInWriter={(qId) => {
             setActiveWorkspaceQuestionId(qId);
-            setActiveTab('answer-writer');
+            setActiveTab('word');
+          }}
+        />
+      )}
+
+      {/* Tab: Exam Planner */}
+      {activeTab === 'exam-planner' && (
+        <ExamPlanner
+          version={activeVersion}
+          target={currentTarget}
+          studyPlans={studyPlans || []}
+          allQuestions={questions || []}
+          studyMaterials={studyMaterials || []}
+          onOpenQuestionInWriter={(qId) => {
+            setActiveWorkspaceQuestionId(qId);
+            setActiveTab('word');
+          }}
+          onOpenMaterial={handleOpenPdfAtPage}
+        />
+      )}
+
+      {/* Tab: Topic Grouping */}
+      {activeTab === 'topic-grouping' && (
+        <TopicGrouping
+          version={activeVersion}
+          allQuestions={questions || []}
+          examAttempts={examAttempts || []}
+          onOpenQuestionInWriter={(qId) => {
+            setActiveWorkspaceQuestionId(qId);
+            setActiveTab('word');
+          }}
+          onLaunchPractice={(paperId, questionIds) => {
+            setActiveTab('exam-environment');
           }}
         />
       )}

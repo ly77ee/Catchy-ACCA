@@ -158,6 +158,8 @@ export const ExtractionReviewModal: React.FC<ExtractionReviewModalProps> = ({
         correctOptionIds: d.correctOptionIds,
         availableMarks: d.availableMarks,
         markingGuide: d.markingGuide,
+        solutionPage: d.solutionPage,
+        matchStatus: d.matchStatus || 'verified',
         extractedFromPdf: true,
         needsReview: false,
         attempts: [],

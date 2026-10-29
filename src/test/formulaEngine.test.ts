@@ -2,12 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   evaluateFormula,
   recomputeSheet,
+  recomputeWorkbook,
   exportSheetToCsv,
   importCsvToSheet,
   calculateIRR,
   formatCellValue
 } from '../utils/formulaEngine';
-import { CellData, SpreadsheetSheet } from '../types';
+import { CellData, SpreadsheetSheet, SpreadsheetWorkbook } from '../types';
 
 describe('Spreadsheet Formula Engine & Financial Calculations', () => {
   it('evaluates basic arithmetic and operator precedence', () => {
@@ -143,5 +144,82 @@ describe('Spreadsheet Formula Engine & Financial Calculations', () => {
     expect(formatCellValue(1250.5, 'currency')).toBe('$1,250.50');
     expect(formatCellValue(0.125, 'percent')).toBe('12.5%');
     expect(formatCellValue('#DIV/0!', 'currency')).toBe('#DIV/0!');
+  });
+
+  it('evaluates COUNTA on mixed text, number, and empty cells', () => {
+    const cells: Record<string, CellData> = {
+      A1: { raw: 'Revenue' },
+      A2: { raw: '50000' },
+      A3: { raw: '' },
+      A4: { raw: 'Overhead' },
+      A5: { raw: '1200' }
+    };
+
+    expect(evaluateFormula('=COUNTA(A1:A5)', cells)).toBe(4);
+  });
+
+  it('evaluates loan payment PMT, PV, and FV financial functions', () => {
+    const cells: Record<string, CellData> = {};
+
+    // PMT: $10,000 loan at 8% annual (0.08) over 5 years
+    // Official Excel: PMT(0.08, 5, 10000) = -2504.56
+    const pmt = evaluateFormula('=PMT(0.08, 5, 10000)', cells);
+    expect(pmt).toBe(2504.56);
+
+    // PV: 5% discount rate, 5 periods, -100 payment per period
+    // PV = ~432.95
+    const pv = evaluateFormula('=PV(0.05, 5, -100)', cells);
+    expect(pv).toBe(432.95);
+
+    // FV: 5% interest rate, 5 periods, -100 payment per period
+    // FV = ~552.56
+    const fv = evaluateFormula('=FV(0.05, 5, -100)', cells);
+    expect(fv).toBe(552.56);
+  });
+
+  it('evaluates cross-sheet references and recomputes multi-sheet workbooks', () => {
+    const sheet1: SpreadsheetSheet = {
+      id: 'sheet-1',
+      name: 'Summary',
+      cells: {
+        A1: { raw: 'Total Profit' },
+        B1: { raw: "=Working!B4 + 'Tax Sheet'!A1" }
+      },
+      rowCount: 10,
+      colCount: 5
+    };
+
+    const sheet2: SpreadsheetSheet = {
+      id: 'sheet-2',
+      name: 'Working',
+      cells: {
+        B4: { raw: '45000' }
+      },
+      rowCount: 10,
+      colCount: 5
+    };
+
+    const sheet3: SpreadsheetSheet = {
+      id: 'sheet-3',
+      name: 'Tax Sheet',
+      cells: {
+        A1: { raw: '5000' }
+      },
+      rowCount: 10,
+      colCount: 5
+    };
+
+    const workbook: SpreadsheetWorkbook = {
+      id: 'wb-1',
+      paperId: 'FM',
+      title: 'Financial Model',
+      activeSheetIndex: 0,
+      sheets: [sheet1, sheet2, sheet3],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const recomputed = recomputeWorkbook(workbook);
+    expect(recomputed.sheets[0].cells['B1']?.computed).toBe(50000);
   });
 });

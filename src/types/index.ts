@@ -131,6 +131,8 @@ export interface QuestionRecord {
   availableMarks?: number; // e.g. 2, 10, 20
   subQuestions?: SubQuestion[];
   markingGuide?: string; // Solution guide / rationale
+  solutionPage?: number;
+  matchStatus?: 'verified' | 'high_confidence' | 'needs_review' | 'unmatched';
   extractedFromPdf?: boolean;
   needsReview?: boolean;
   createdAt: string;
@@ -196,6 +198,8 @@ export interface ExtractedQuestionDraft {
   availableMarks: number;
   topicSuggestions: string[];
   markingGuide?: string;
+  solutionPage?: number;
+  matchStatus?: 'verified' | 'high_confidence' | 'needs_review' | 'unmatched';
   confidenceScore: number; // 0-1
   warningMessages: string[];
   isApproved: boolean;

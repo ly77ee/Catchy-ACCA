@@ -1,4 +1,4 @@
-import { CellData, CellFormat, SpreadsheetSheet } from '../types';
+import { CellData, CellFormat, SpreadsheetSheet, SpreadsheetWorkbook } from '../types';
 
 /**
  * Converts column index (0-based) to column letter (A, B, C ... AA, AB).
@@ -42,11 +42,21 @@ export function parseCellAddress(addr: string): { col: number; row: number; colL
 }
 
 /**
- * Expands a range like "A1:B3" into a list of cell coordinates: ["A1", "A2", "A3", "B1", "B2", "B3"].
+ * Expands a range like "A1:B3" or "Sheet2!A1:B3" into a list of cell coordinates:
+ * ["A1", "A2", "A3", "B1", "B2", "B3"] or ["Sheet2!A1", "Sheet2!A2", ...].
  */
 export function expandRange(rangeStr: string): string[] {
-  const parts = rangeStr.split(':');
-  if (parts.length === 1) return [parts[0].trim().toUpperCase()];
+  let prefix = '';
+  let coreRange = rangeStr.trim();
+
+  if (coreRange.includes('!')) {
+    const splitIdx = coreRange.lastIndexOf('!');
+    prefix = coreRange.substring(0, splitIdx + 1);
+    coreRange = coreRange.substring(splitIdx + 1).trim();
+  }
+
+  const parts = coreRange.split(':');
+  if (parts.length === 1) return [prefix + parts[0].trim().toUpperCase()];
   if (parts.length !== 2) return [];
 
   const start = parseCellAddress(parts[0]);
@@ -62,7 +72,7 @@ export function expandRange(rangeStr: string): string[] {
   for (let c = minCol; c <= maxCol; c++) {
     const colLetter = colIndexToLetter(c);
     for (let r = minRow; r <= maxRow; r++) {
-      cells.push(`${colLetter}${r + 1}`);
+      cells.push(`${prefix}${colLetter}${r + 1}`);
     }
   }
   return cells;
@@ -106,7 +116,8 @@ export function evaluateFormula(
   formula: string,
   cells: Record<string, CellData>,
   currentCellId?: string,
-  callStack: Set<string> = new Set()
+  callStack: Set<string> = new Set(),
+  allSheets?: SpreadsheetSheet[]
 ): any {
   const trimmed = formula.trim();
   if (!trimmed.startsWith('=')) {
@@ -126,7 +137,7 @@ export function evaluateFormula(
   const expr = trimmed.substring(1).trim();
 
   try {
-    const result = evaluateExpression(expr, cells, currentCellId, callStack);
+    const result = evaluateExpression(expr, cells, currentCellId, callStack, allSheets);
     if (currentCellId) callStack.delete(currentCellId);
     return result;
   } catch (err: any) {
@@ -137,24 +148,59 @@ export function evaluateFormula(
 }
 
 /**
+ * Helper to resolve raw cell text for COUNTA or presence checks.
+ */
+function resolveRawCell(
+  addr: string,
+  cells: Record<string, CellData>,
+  allSheets?: SpreadsheetSheet[]
+): string | undefined {
+  let targetCells = cells;
+  let cleanAddr = addr.trim().replace(/\$/g, '');
+
+  if (cleanAddr.includes('!')) {
+    const splitIdx = cleanAddr.lastIndexOf('!');
+    const sheetName = cleanAddr.substring(0, splitIdx).replace(/^['"]|['"]$/g, '');
+    cleanAddr = cleanAddr.substring(splitIdx + 1);
+
+    if (allSheets && allSheets.length > 0) {
+      const foundSheet = allSheets.find(
+        s => s.name.toLowerCase() === sheetName.toLowerCase() || s.id.toLowerCase() === sheetName.toLowerCase()
+      );
+      if (foundSheet) {
+        targetCells = foundSheet.cells;
+      } else {
+        return undefined;
+      }
+    } else {
+      return undefined;
+    }
+  }
+
+  const cell = targetCells[cleanAddr.toUpperCase()];
+  return cell ? cell.raw : undefined;
+}
+
+/**
  * Parses and evaluates an expression supporting functions, operations, ranges, and cell references.
  */
 function evaluateExpression(
   expr: string,
   cells: Record<string, CellData>,
   currentCellId?: string,
-  callStack: Set<string> = new Set()
+  callStack: Set<string> = new Set(),
+  allSheets?: SpreadsheetSheet[]
 ): any {
   // Check for functions: FUNCTION_NAME(...)
   const fnMatch = expr.match(/^([A-Za-z_][A-Za-z0-9_\.]*)\((.*)\)$/s);
   if (fnMatch) {
     const fnName = fnMatch[1].toUpperCase();
     const argsRaw = splitArguments(fnMatch[2]);
-    return executeFunction(fnName, argsRaw, cells, currentCellId, callStack);
+    return executeFunction(fnName, argsRaw, cells, currentCellId, callStack, allSheets);
   }
 
   // Handle arithmetic and logic expression using a clean recursive descent tokenizer
-  return parseArithmetic(expr, cells, currentCellId, callStack);
+  return parseArithmetic(expr, cells, currentCellId, callStack, allSheets);
 }
 
 /**
@@ -191,7 +237,8 @@ function executeFunction(
   args: string[],
   cells: Record<string, CellData>,
   currentCellId?: string,
-  callStack: Set<string> = new Set()
+  callStack: Set<string> = new Set(),
+  allSheets?: SpreadsheetSheet[]
 ): any {
   // Resolve numeric list from arguments (expanding ranges)
   const getValues = (): number[] => {
@@ -200,11 +247,11 @@ function executeFunction(
       if (arg.includes(':')) {
         const rangeCells = expandRange(arg);
         for (const addr of rangeCells) {
-          const val = resolveCellValue(addr, cells, currentCellId, callStack);
+          const val = resolveCellValue(addr, cells, currentCellId, callStack, allSheets);
           if (typeof val === 'number' && !isNaN(val)) vals.push(val);
         }
       } else {
-        const val = evaluateExpression(arg, cells, currentCellId, callStack);
+        const val = evaluateExpression(arg, cells, currentCellId, callStack, allSheets);
         if (typeof val === 'number' && !isNaN(val)) vals.push(val);
       }
     }
@@ -228,6 +275,27 @@ function executeFunction(
       return vals.length;
     }
 
+    case 'COUNTA': {
+      let count = 0;
+      for (const arg of args) {
+        if (arg.includes(':')) {
+          const rangeCells = expandRange(arg);
+          for (const addr of rangeCells) {
+            const rawVal = resolveRawCell(addr, cells, allSheets);
+            if (rawVal !== undefined && rawVal !== null && rawVal.trim() !== '') {
+              count++;
+            }
+          }
+        } else {
+          const val = evaluateExpression(arg, cells, currentCellId, callStack, allSheets);
+          if (val !== null && val !== undefined && val !== '' && val !== '#ERROR!') {
+            count++;
+          }
+        }
+      }
+      return count;
+    }
+
     case 'MIN': {
       const vals = getValues();
       return vals.length === 0 ? 0 : Math.min(...vals);
@@ -240,15 +308,15 @@ function executeFunction(
 
     case 'ABS': {
       if (args.length !== 1) return '#VALUE!';
-      const val = evaluateExpression(args[0], cells, currentCellId, callStack);
+      const val = evaluateExpression(args[0], cells, currentCellId, callStack, allSheets);
       if (typeof val !== 'number') return '#VALUE!';
       return Math.abs(val);
     }
 
     case 'ROUND': {
       if (args.length < 1 || args.length > 2) return '#VALUE!';
-      const num = evaluateExpression(args[0], cells, currentCellId, callStack);
-      const decimals = args[1] ? evaluateExpression(args[1], cells, currentCellId, callStack) : 0;
+      const num = evaluateExpression(args[0], cells, currentCellId, callStack, allSheets);
+      const decimals = args[1] ? evaluateExpression(args[1], cells, currentCellId, callStack, allSheets) : 0;
       if (typeof num !== 'number' || typeof decimals !== 'number') return '#VALUE!';
       const factor = Math.pow(10, decimals);
       return Math.round(num * factor) / factor;
@@ -256,12 +324,12 @@ function executeFunction(
 
     case 'IF': {
       if (args.length < 2 || args.length > 3) return '#VALUE!';
-      const condition = evaluateExpression(args[0], cells, currentCellId, callStack);
+      const condition = evaluateExpression(args[0], cells, currentCellId, callStack, allSheets);
       const isTrue = condition === true || (typeof condition === 'number' && condition !== 0);
       if (isTrue) {
-        return evaluateExpression(args[1], cells, currentCellId, callStack);
+        return evaluateExpression(args[1], cells, currentCellId, callStack, allSheets);
       } else {
-        return args[2] ? evaluateExpression(args[2], cells, currentCellId, callStack) : 0;
+        return args[2] ? evaluateExpression(args[2], cells, currentCellId, callStack, allSheets) : 0;
       }
     }
 
@@ -269,7 +337,7 @@ function executeFunction(
       // Syntax: NPV(discount_rate, val1, val2...) or NPV(rate, range)
       // ACCA Formula: Sum of CF_t / (1 + r)^t
       if (args.length < 2) return '#VALUE!';
-      const rate = evaluateExpression(args[0], cells, currentCellId, callStack);
+      const rate = evaluateExpression(args[0], cells, currentCellId, callStack, allSheets);
       if (typeof rate !== 'number' || rate <= -1) return '#VALUE!';
 
       const cashFlowArgs = args.slice(1);
@@ -278,11 +346,11 @@ function executeFunction(
         if (cfArg.includes(':')) {
           const addrs = expandRange(cfArg);
           for (const addr of addrs) {
-            const v = resolveCellValue(addr, cells, currentCellId, callStack);
+            const v = resolveCellValue(addr, cells, currentCellId, callStack, allSheets);
             if (typeof v === 'number') cashFlows.push(v);
           }
         } else {
-          const v = evaluateExpression(cfArg, cells, currentCellId, callStack);
+          const v = evaluateExpression(cfArg, cells, currentCellId, callStack, allSheets);
           if (typeof v === 'number') cashFlows.push(v);
         }
       }
@@ -301,29 +369,75 @@ function executeFunction(
       if (args[0].includes(':')) {
         const addrs = expandRange(args[0]);
         for (const addr of addrs) {
-          const v = resolveCellValue(addr, cells, currentCellId, callStack);
+          const v = resolveCellValue(addr, cells, currentCellId, callStack, allSheets);
           if (typeof v === 'number') cashFlows.push(v);
         }
       } else {
         return '#VALUE!';
       }
 
-      const guess = args[1] ? evaluateExpression(args[1], cells, currentCellId, callStack) : 0.1;
+      const guess = args[1] ? evaluateExpression(args[1], cells, currentCellId, callStack, allSheets) : 0.1;
       return calculateIRR(cashFlows, typeof guess === 'number' ? guess : 0.1);
     }
 
     case 'PMT': {
       // Syntax: PMT(rate, nper, pv)
       if (args.length < 3) return '#VALUE!';
-      const rate = evaluateExpression(args[0], cells, currentCellId, callStack);
-      const nper = evaluateExpression(args[1], cells, currentCellId, callStack);
-      const pv = evaluateExpression(args[2], cells, currentCellId, callStack);
+      const rate = evaluateExpression(args[0], cells, currentCellId, callStack, allSheets);
+      const nper = evaluateExpression(args[1], cells, currentCellId, callStack, allSheets);
+      const pv = evaluateExpression(args[2], cells, currentCellId, callStack, allSheets);
 
       if (typeof rate !== 'number' || typeof nper !== 'number' || typeof pv !== 'number') return '#VALUE!';
       if (rate === 0) return -pv / nper;
 
       const pmt = (pv * rate * Math.pow(1 + rate, nper)) / (Math.pow(1 + rate, nper) - 1);
       return Math.round(pmt * 100) / 100;
+    }
+
+    case 'PV': {
+      // Syntax: PV(rate, nper, pmt, [fv], [type])
+      if (args.length < 3) return '#VALUE!';
+      const rate = evaluateExpression(args[0], cells, currentCellId, callStack, allSheets);
+      const nper = evaluateExpression(args[1], cells, currentCellId, callStack, allSheets);
+      const pmt = evaluateExpression(args[2], cells, currentCellId, callStack, allSheets);
+      const fv = args[3] ? evaluateExpression(args[3], cells, currentCellId, callStack, allSheets) : 0;
+      const type = args[4] ? evaluateExpression(args[4], cells, currentCellId, callStack, allSheets) : 0;
+
+      if (typeof rate !== 'number' || typeof nper !== 'number' || typeof pmt !== 'number' || typeof fv !== 'number') {
+        return '#VALUE!';
+      }
+
+      let pv = 0;
+      if (rate === 0) {
+        pv = -(fv + pmt * nper);
+      } else {
+        const factor = Math.pow(1 + rate, nper);
+        pv = -(pmt * (1 + rate * (type ? 1 : 0)) * ((factor - 1) / rate) + fv) / factor;
+      }
+      return Math.round(pv * 100) / 100;
+    }
+
+    case 'FV': {
+      // Syntax: FV(rate, nper, pmt, [pv], [type])
+      if (args.length < 3) return '#VALUE!';
+      const rate = evaluateExpression(args[0], cells, currentCellId, callStack, allSheets);
+      const nper = evaluateExpression(args[1], cells, currentCellId, callStack, allSheets);
+      const pmt = evaluateExpression(args[2], cells, currentCellId, callStack, allSheets);
+      const pv = args[3] ? evaluateExpression(args[3], cells, currentCellId, callStack, allSheets) : 0;
+      const type = args[4] ? evaluateExpression(args[4], cells, currentCellId, callStack, allSheets) : 0;
+
+      if (typeof rate !== 'number' || typeof nper !== 'number' || typeof pmt !== 'number' || typeof pv !== 'number') {
+        return '#VALUE!';
+      }
+
+      let fv = 0;
+      if (rate === 0) {
+        fv = -(pv + pmt * nper);
+      } else {
+        const factor = Math.pow(1 + rate, nper);
+        fv = -(pv * factor + pmt * (1 + rate * (type ? 1 : 0)) * ((factor - 1) / rate));
+      }
+      return Math.round(fv * 100) / 100;
     }
 
     default:
@@ -379,11 +493,12 @@ function parseArithmetic(
   expr: string,
   cells: Record<string, CellData>,
   currentCellId?: string,
-  callStack: Set<string> = new Set()
+  callStack: Set<string> = new Set(),
+  allSheets?: SpreadsheetSheet[]
 ): any {
-  // Replace cell references (like A1, B12) with their evaluated numeric or string values
-  const substituted = expr.replace(/\b([A-Z]+[0-9]+)\b/gi, (match) => {
-    const val = resolveCellValue(match.toUpperCase(), cells, currentCellId, callStack);
+  // Replace cell references (like A1, Sheet2!B12, 'Sheet 1'!A1, $A$1) with their evaluated numeric or string values
+  const substituted = expr.replace(/(?:(?:'([^']+)'|([A-Za-z0-9_]+))!\$?([A-Z]+)\$?([0-9]+)|\$?([A-Z]+)\$?([0-9]+))/gi, (match) => {
+    const val = resolveCellValue(match, cells, currentCellId, callStack, allSheets);
     if (typeof val === 'string' && val.startsWith('#')) {
       throw new Error(val);
     }
@@ -495,20 +610,43 @@ function evaluateTokens(tokens: string[]): number {
 }
 
 /**
- * Resolves the computed value of a cell address.
+ * Resolves the computed value of a cell address, supporting cross-sheet references (e.g. Sheet2!A1).
  */
 export function resolveCellValue(
   addr: string,
   cells: Record<string, CellData>,
   currentCellId?: string,
-  callStack: Set<string> = new Set()
+  callStack: Set<string> = new Set(),
+  allSheets?: SpreadsheetSheet[]
 ): any {
-  const key = addr.toUpperCase();
-  const cell = cells[key];
+  let targetCells = cells;
+  let cleanAddr = addr.trim().replace(/\$/g, '');
+
+  if (cleanAddr.includes('!')) {
+    const splitIdx = cleanAddr.lastIndexOf('!');
+    const sheetName = cleanAddr.substring(0, splitIdx).replace(/^['"]|['"]$/g, '');
+    cleanAddr = cleanAddr.substring(splitIdx + 1);
+
+    if (allSheets && allSheets.length > 0) {
+      const foundSheet = allSheets.find(
+        s => s.name.toLowerCase() === sheetName.toLowerCase() || s.id.toLowerCase() === sheetName.toLowerCase()
+      );
+      if (foundSheet) {
+        targetCells = foundSheet.cells;
+      } else {
+        return '#REF!';
+      }
+    } else {
+      return '#REF!';
+    }
+  }
+
+  const key = cleanAddr.toUpperCase();
+  const cell = targetCells[key];
   if (!cell) return 0;
 
   if (cell.raw && cell.raw.startsWith('=')) {
-    return evaluateFormula(cell.raw, cells, key, callStack);
+    return evaluateFormula(cell.raw, targetCells, key, callStack, allSheets);
   }
 
   const num = Number(cell.raw);
@@ -518,13 +656,13 @@ export function resolveCellValue(
 /**
  * Recomputes all cells in a sheet, populating cell.computed.
  */
-export function recomputeSheet(sheet: SpreadsheetSheet): SpreadsheetSheet {
+export function recomputeSheet(sheet: SpreadsheetSheet, allSheets?: SpreadsheetSheet[]): SpreadsheetSheet {
   const updatedCells: Record<string, CellData> = {};
 
   for (const [addr, cell] of Object.entries(sheet.cells)) {
     if (!cell) continue;
     if (cell.raw.startsWith('=')) {
-      const computed = evaluateFormula(cell.raw, sheet.cells, addr);
+      const computed = evaluateFormula(cell.raw, sheet.cells, addr, new Set(), allSheets);
       updatedCells[addr] = { ...cell, computed };
     } else {
       const num = Number(cell.raw);
@@ -536,6 +674,18 @@ export function recomputeSheet(sheet: SpreadsheetSheet): SpreadsheetSheet {
   return {
     ...sheet,
     cells: updatedCells
+  };
+}
+
+/**
+ * Recomputes all sheets across a workbook preserving cross-sheet formulas.
+ */
+export function recomputeWorkbook(workbook: SpreadsheetWorkbook): SpreadsheetWorkbook {
+  const updatedSheets = workbook.sheets.map(sheet => recomputeSheet(sheet, workbook.sheets));
+  return {
+    ...workbook,
+    sheets: updatedSheets,
+    updatedAt: new Date().toISOString()
   };
 }
 
