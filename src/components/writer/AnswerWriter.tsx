@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
@@ -67,8 +67,22 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
   const [reviewResult, setReviewResult] = useState<AnswerReviewResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showTableMenu, setShowTableMenu] = useState(false);
+  const [editorStats, setEditorStats] = useState<{ wordCount: number; charCount: number }>({
+    wordCount: 0,
+    charCount: 0,
+  });
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper to accurately compute word and character counts without duplicates or phantom words
+  const computeStats = useCallback((text: string) => {
+    const trimmed = text.trim();
+    const words = trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0;
+    return {
+      wordCount: words,
+      charCount: text.length,
+    };
+  }, []);
 
   // Initialize TipTap Editor with extensions
   const editor = useEditor({
@@ -83,18 +97,25 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
       TableHeader,
       TableCell,
     ],
-    content: '<p>Start typing your structured ACCA answer here...</p>',
+    content: '<p></p>',
     editorProps: {
       attributes: {
-        class: 'focus:outline-none min-h-[480px] text-gray-900 leading-relaxed font-sans',
+        class: 'focus:outline-none min-h-[480px] text-gray-100 leading-relaxed font-sans prose prose-invert max-w-none',
       },
     },
-    onUpdate: () => {
+    onCreate: ({ editor: ed }) => {
+      setEditorStats(computeStats(ed.getText()));
+    },
+    onUpdate: ({ editor: ed }) => {
+      setEditorStats(computeStats(ed.getText()));
       setSaveStatus('dirty');
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         handleAutoSave();
       }, 1000);
+    },
+    onSelectionUpdate: ({ editor: ed }) => {
+      setEditorStats(computeStats(ed.getText()));
     },
   });
 
@@ -119,6 +140,8 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
         if (editor && !editor.isDestroyed && drafts[0].contentHtml) {
           try {
             editor.commands.setContent(drafts[0].contentHtml);
+            const plain = drafts[0].plainText || editor.getText();
+            setEditorStats(computeStats(plain));
           } catch {}
         }
       } else {
@@ -131,7 +154,7 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
             ? `Answer: ${allQuestions.find((q) => q.id === selectedQuestionId)?.title || 'Question'}`
             : `${selectedPaperId} CBE Word Response`,
           attemptNumber: 1,
-          contentHtml: '<p>Start typing your structured ACCA answer here...</p>',
+          contentHtml: '<p></p>',
           plainText: '',
           wordCount: 0,
           createdAt: new Date().toISOString(),
@@ -142,6 +165,7 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
         if (editor && !editor.isDestroyed) {
           try {
             editor.commands.setContent(blank.contentHtml);
+            setEditorStats({ wordCount: 0, charCount: 0 });
           } catch {}
         }
       }
@@ -164,14 +188,15 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
     setSaveStatus('saving');
     const html = editor.getHTML();
     const text = editor.getText();
-    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const stats = computeStats(text);
+    setEditorStats(stats);
     const now = new Date().toISOString();
 
     const updated: WrittenAnswerDraft = {
       ...activeDraft,
       contentHtml: html,
       plainText: text,
-      wordCount: words,
+      wordCount: stats.wordCount,
       updatedAt: now,
     };
 
@@ -227,6 +252,7 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
     setAnswerAttempts(updated);
     setActiveAttemptIndex(0);
     editor.commands.setContent(newDraft.contentHtml);
+    setEditorStats({ wordCount: 0, charCount: 0 });
     await logActivity('New Answer Attempt', `Started attempt ${nextNumber} for ${selectedPaperId}`, 'workspace');
   };
 
@@ -235,7 +261,9 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
     if (!editor || index === activeAttemptIndex) return;
     handleAutoSave();
     setActiveAttemptIndex(index);
-    editor.commands.setContent(answerAttempts[index].contentHtml);
+    const target = answerAttempts[index];
+    editor.commands.setContent(target.contentHtml || '');
+    setEditorStats(computeStats(target.plainText || editor.getText()));
   };
 
   // Copy answer to clipboard
@@ -326,8 +354,8 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
     }, 350);
   };
 
-  const wordCount = editor ? (editor.getText().trim() ? editor.getText().trim().split(/\s+/).length : 0) : 0;
-  const charCount = editor ? editor.getText().length : 0;
+  const wordCount = editorStats.wordCount;
+  const charCount = editorStats.charCount;
 
   const paperQuestions = allQuestions.filter((q) => q.paperId === selectedPaperId);
   const selectedQuestion = allQuestions.find((q) => q.id === selectedQuestionId);
@@ -749,17 +777,17 @@ export const AnswerWriter: React.FC<AnswerWriterProps> = ({
         </div>
       </div>
 
-      {/* Main Full-Height Document Canvas */}
-      <div className="flex-1 overflow-y-auto bg-[#101015] p-3 sm:p-6 flex justify-center cursor-default">
-        <div
-          onClick={() => {
-            if (editor && !editor.isFocused) {
-              editor.commands.focus('end');
-            }
-          }}
-          className="w-full max-w-4xl bg-white text-gray-900 rounded-lg shadow-2xl border border-gray-300 min-h-full p-6 sm:p-10 flex flex-col cursor-text"
-        >
-          <EditorContent editor={editor} className="flex-1" />
+      {/* Main Single Authoritative Document Writing Workspace */}
+      <div
+        onClick={() => {
+          if (editor && !editor.isFocused) {
+            editor.commands.focus('end');
+          }
+        }}
+        className="flex-1 overflow-y-auto bg-[#141419] p-4 sm:p-8 flex justify-center cursor-text"
+      >
+        <div className="w-full max-w-4xl min-h-full flex flex-col">
+          <EditorContent editor={editor} className="flex-1 focus:outline-none min-h-full" />
         </div>
       </div>
 

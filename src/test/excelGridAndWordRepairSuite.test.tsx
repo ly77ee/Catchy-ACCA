@@ -318,16 +318,16 @@ describe('Catchy ACCA: Excel Grid Repair Beyond Column N, Word Editor Boundary &
         />
       );
 
-      // Verify canvas container has cursor-default
-      const outerCanvas = container.querySelector('.bg-\\[\\#101015\\].p-3');
-      expect(outerCanvas).toBeInTheDocument();
-      expect(outerCanvas?.className).toContain('cursor-default');
+      // Verify the single authoritative document workspace is rendered with cursor-text
+      const mainWorkspace = container.querySelector('.bg-\\[\\#141419\\].p-4');
+      expect(mainWorkspace).toBeInTheDocument();
+      expect(mainWorkspace?.className).toContain('cursor-text');
+      expect(mainWorkspace?.className).toContain('overflow-y-auto');
 
-      // Verify white page card has cursor-text and max-w-4xl
-      const whiteCard = container.querySelector('.bg-white.text-gray-900.rounded-lg');
-      expect(whiteCard).toBeInTheDocument();
-      expect(whiteCard?.className).toContain('max-w-4xl');
-      expect(whiteCard?.className).toContain('cursor-text');
+      // Verify ProseMirror editor exists inside
+      const proseMirror = container.querySelector('.ProseMirror');
+      expect(proseMirror).toBeInTheDocument();
+      expect(proseMirror?.getAttribute('contenteditable')).toBe('true');
     });
 
     it('5.2. Isolates answers per question and automatically saves on switch', async () => {

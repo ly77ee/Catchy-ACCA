@@ -84,27 +84,27 @@ export const Help: React.FC<HelpProps> = ({ onNavigate }) => {
           </button>
         </div>
 
-        {/* Card 3 */}
+        {/* Card 3: Question Checklist & Study Progress */}
         <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs space-y-3">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 bg-red-50 text-acca-red rounded-xl">
-              <HelpCircle className="w-5 h-5" />
+              <CheckCircle className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-gray-900 text-base">Question Bank & Doubt Flagging</h3>
+            <h3 className="font-bold text-gray-900 text-base">Question Checklist & Study Progress</h3>
           </div>
           <p className="text-xs text-gray-600 leading-relaxed">
-            Log questions you've practiced, record confidence stars (1-5), and link each question directly to its source PDF page.
+            Create custom question checklists, import past exam task lists line-by-line, and monitor your topic mastery across all ACCA papers.
           </p>
           <ul className="text-xs text-gray-600 list-disc pl-5 space-y-1">
-            <li>Click <strong>Open PDF (p. X)</strong> on any question to jump right to that page in the PDF viewer.</li>
-            <li>Flag questions as <strong>Doubts</strong> to review before exam week.</li>
-            <li>Group by topic (e.g. Consolidation, Leases, Variances) or by paper.</li>
+            <li>Type tasks line-by-line or paste to instantly generate clean checklists.</li>
+            <li>Assign checklists to specific ACCA papers (FR, PM, SBR, etc.) to track coverage.</li>
+            <li>Monitor syllabus chapter mastery in the Progress tracker with automatic saving.</li>
           </ul>
           <button
-            onClick={() => onNavigate('questions')}
+            onClick={() => onNavigate('checklist')}
             className="text-xs font-bold text-acca-red hover:underline flex items-center space-x-1 pt-2"
           >
-            <span>Open Question Manager</span>
+            <span>Open Question Checklist</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
