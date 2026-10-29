@@ -728,3 +728,47 @@ export async function deleteNoteFolder(
     throw err;
   }
 }
+
+// ============================================================================
+// Multiple Exam Targets Helpers
+// ============================================================================
+
+export async function getTargets(): Promise<StudentTarget[]> {
+  try {
+    return await db.targets.toArray();
+  } catch (err) {
+    console.error('Failed to fetch exam targets:', err);
+    return [];
+  }
+}
+
+export async function saveTarget(target: StudentTarget): Promise<void> {
+  try {
+    const paper = target.paperId || target.nextExamPaperId || 'FR';
+    const date = target.examDate || target.nextExamDate;
+    const now = new Date().toISOString();
+
+    const normalized: StudentTarget = {
+      ...target,
+      paperId: paper,
+      nextExamPaperId: paper,
+      examDate: date,
+      nextExamDate: date,
+      createdAt: target.createdAt || now,
+      updatedAt: now,
+    };
+    await db.targets.put(normalized);
+  } catch (err) {
+    console.error('Failed to save exam target:', err);
+    throw err;
+  }
+}
+
+export async function deleteTarget(id: string): Promise<void> {
+  try {
+    await db.targets.delete(id);
+  } catch (err) {
+    console.error('Failed to delete exam target:', err);
+    throw err;
+  }
+}

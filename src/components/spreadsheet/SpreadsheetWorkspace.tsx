@@ -325,9 +325,87 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
       }
     };
 
+    // Helper to reveal active cell column horizontally
+    const revealActiveCell = (col: number) => {
+      const scrollbarX = container.querySelector<HTMLDivElement>('.luckysheet-scrollbar-x');
+      const viewportEl = container.querySelector<HTMLDivElement>('.fortune-sheet-container') || container;
+      if (!scrollbarX || !viewportEl) return;
+
+      const defaultColWidth = 74;
+      const rowHeaderWidth = 46;
+      const cellLeft = col * defaultColWidth;
+      const cellRight = cellLeft + defaultColWidth;
+      const currentScroll = scrollbarX.scrollLeft;
+      const viewportWidth = viewportEl.clientWidth - rowHeaderWidth;
+
+      if (viewportWidth <= 0) return;
+
+      if (cellRight > currentScroll + viewportWidth - 10) {
+        const nextScroll = cellRight - viewportWidth + 60;
+        scrollbarX.scrollLeft = nextScroll;
+        scrollbarX.dispatchEvent(new Event('scroll'));
+      } else if (cellLeft < currentScroll + 10) {
+        const nextScroll = Math.max(0, cellLeft - 40);
+        scrollbarX.scrollLeft = nextScroll;
+        scrollbarX.dispatchEvent(new Event('scroll'));
+      }
+    };
+
+    // Trackpad & Shift+Wheel horizontal scrolling
+    const handleWheel = (e: WheelEvent) => {
+      let deltaX = e.deltaX;
+      if (e.shiftKey && deltaX === 0 && e.deltaY !== 0) {
+        deltaX = e.deltaY;
+      }
+      if (deltaX !== 0) {
+        const scrollbarX = container.querySelector<HTMLDivElement>('.luckysheet-scrollbar-x');
+        if (scrollbarX) {
+          e.preventDefault();
+          scrollbarX.scrollLeft += deltaX;
+          scrollbarX.dispatchEvent(new Event('scroll'));
+        }
+      }
+    };
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
+    // Monitor active cell changes via FortuneSheet name-box mutation
+    let observer: MutationObserver | null = null;
+    const nameBox = container.querySelector<HTMLDivElement>('.fortune-name-box');
+    if (nameBox) {
+      observer = new MutationObserver(() => {
+        const text = nameBox.textContent || nameBox.innerText;
+        if (text) {
+          const parsed = parseCellAddress(text);
+          if (parsed) {
+            revealActiveCell(parsed.col);
+          }
+        }
+      });
+      observer.observe(nameBox, { childList: true, characterData: true, subtree: true });
+    }
+
+    // Keyboard navigation auto-reveal (Arrow keys, Tab, Shift+Tab)
+    const handleKeyNavCheck = (e: KeyboardEvent) => {
+      if (['ArrowRight', 'ArrowLeft', 'Tab'].includes(e.key)) {
+        setTimeout(() => {
+          const nb = container.querySelector<HTMLDivElement>('.fortune-name-box');
+          if (nb && nb.textContent) {
+            const parsed = parseCellAddress(nb.textContent);
+            if (parsed) {
+              revealActiveCell(parsed.col);
+            }
+          }
+        }, 15);
+      }
+    };
+    container.addEventListener('keyup', handleKeyNavCheck);
+
     container.addEventListener('keydown', handleKeyDownCapture, { capture: true });
     return () => {
       container.removeEventListener('keydown', handleKeyDownCapture, { capture: true });
+      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('keyup', handleKeyNavCheck);
+      if (observer) observer.disconnect();
       clearVisualRangeBox();
     };
   }, [isLoading]);

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import {
   QualificationVersion,
   StudyPlanItem,
@@ -35,12 +36,15 @@ import {
   ArrowDown,
   Sparkles,
   X,
-  Flame
+  Flame,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface ExamPlannerProps {
   version: QualificationVersion;
   target: StudentTarget | null;
+  targets?: StudentTarget[];
   studyPlans: StudyPlanItem[];
   allQuestions: QuestionRecord[];
   studyMaterials: StudyMaterial[];
@@ -53,12 +57,23 @@ const HOURS_GRID = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
 export const ExamPlanner: React.FC<ExamPlannerProps> = ({
   version,
   target,
+  targets: propTargets,
   studyPlans,
   allQuestions,
   studyMaterials,
   onOpenQuestionInWriter,
   onOpenMaterial,
 }) => {
+  // Reactive targets query from IndexedDB
+  const liveTargets = useLiveQuery(() => db.targets.toArray(), [], []);
+
+  // Consolidate targets: live query > prop targets > legacy single target prop
+  const allTargets = useMemo(() => {
+    if (liveTargets && liveTargets.length > 0) return liveTargets;
+    if (propTargets && propTargets.length > 0) return propTargets;
+    return target && (target.nextExamPaperId || target.paperId) ? [target] : [];
+  }, [liveTargets, propTargets, target]);
+
   // View mode: 'timetable' (default) vs 'list'
   const [viewMode, setViewMode] = useState<'timetable' | 'list'>('timetable');
 
@@ -82,13 +97,18 @@ export const ExamPlanner: React.FC<ExamPlannerProps> = ({
   const [sessionNotes, setSessionNotes] = useState('');
   const [isAllDay, setIsAllDay] = useState(false);
 
-  // Exam Target Modal State
+  // Exam Target Modal State (Support Multiple Exam Targets)
   const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
-  const [targetPaperId, setTargetPaperId] = useState(target?.nextExamPaperId || 'FR');
-  const [targetDate, setTargetDate] = useState(target?.nextExamDate || '');
-  const [targetScore, setTargetScore] = useState(target?.targetScore || 70);
-  const [weeklyHoursGoal, setWeeklyHoursGoal] = useState(target?.weeklyStudyHours || 15);
-  const [targetNotes, setTargetNotes] = useState(target?.notes || '');
+  const [editingTarget, setEditingTarget] = useState<StudentTarget | null>(null);
+  const [targetPaperId, setTargetPaperId] = useState('PM');
+  const [targetDate, setTargetDate] = useState('');
+  const [targetTime, setTargetTime] = useState('');
+  const [targetSessionLabel, setTargetSessionLabel] = useState('');
+  const [targetScore, setTargetScore] = useState(70);
+  const [weeklyHoursGoal, setWeeklyHoursGoal] = useState(15);
+  const [targetNotes, setTargetNotes] = useState('');
+  const [targetWarning, setTargetWarning] = useState<string | null>(null);
+  const [showPastTargets, setShowPastTargets] = useState(false);
 
   // Today local string for comparison
   const todayStr = useMemo(() => toLocalDateString(new Date()), []);
@@ -183,7 +203,6 @@ export const ExamPlanner: React.FC<ExamPlannerProps> = ({
     e.preventDefault();
     if (!sessionTitle.trim()) return;
 
-    // Calculate duration in minutes if start and end time are provided
     let calculatedMinutes = sessionMinutes;
     if (!isAllDay && sessionStartTime && sessionEndTime) {
       const [sh, sm] = sessionStartTime.split(':').map(Number);
@@ -241,37 +260,126 @@ export const ExamPlanner: React.FC<ExamPlannerProps> = ({
     }
   };
 
-  // Save Target Exam
+  // Open Add Exam Target Modal
+  const handleOpenAddTarget = () => {
+    setEditingTarget(null);
+    setTargetPaperId('PM');
+    setTargetDate('');
+    setTargetTime('');
+    setTargetSessionLabel('');
+    setTargetScore(70);
+    setWeeklyHoursGoal(15);
+    setTargetNotes('');
+    setTargetWarning(null);
+    setIsTargetModalOpen(true);
+  };
+
+  // Open Edit Exam Target Modal
+  const handleOpenEditTarget = (t: StudentTarget, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setEditingTarget(t);
+    setTargetPaperId(t.paperId || t.nextExamPaperId || 'FR');
+    setTargetDate(t.examDate || t.nextExamDate || '');
+    setTargetTime(t.examTime || '');
+    setTargetSessionLabel(t.sessionLabel || '');
+    setTargetScore(t.targetScore || 70);
+    setWeeklyHoursGoal(t.weeklyStudyHours || 15);
+    setTargetNotes(t.notes || '');
+    setTargetWarning(null);
+    setIsTargetModalOpen(true);
+  };
+
+  // Save Target Exam (Add or Edit)
   const handleSaveTarget = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!targetPaperId || !targetDate.trim()) {
+      setTargetWarning('Please select an ACCA paper and specify an exam date.');
+      return;
+    }
+
+    // Check duplicate targets for same paper and same date
+    const duplicate = allTargets.find(
+      (t) =>
+        (!editingTarget || t.id !== editingTarget.id) &&
+        (t.paperId === targetPaperId || t.nextExamPaperId === targetPaperId) &&
+        (t.examDate === targetDate.trim() || t.nextExamDate === targetDate.trim())
+    );
+
+    if (duplicate && !targetWarning) {
+      setTargetWarning(`A target for ${targetPaperId} on ${targetDate} already exists. Click Save again to confirm.`);
+      return;
+    }
+
+    const now = new Date().toISOString();
     const updatedTarget: StudentTarget = {
-      id: target?.id || 'default',
+      id: editingTarget?.id || 'target-' + Date.now(),
+      paperId: targetPaperId,
       nextExamPaperId: targetPaperId,
-      nextExamDate: targetDate.trim() || undefined,
+      examDate: targetDate.trim(),
+      nextExamDate: targetDate.trim(),
+      examTime: targetTime.trim() || undefined,
+      sessionLabel: targetSessionLabel.trim() || undefined,
       targetScore: Number(targetScore) || 70,
       weeklyStudyHours: Number(weeklyHoursGoal) || 15,
-      notes: targetNotes.trim(),
+      notes: targetNotes.trim() || undefined,
+      createdAt: editingTarget?.createdAt || now,
+      updatedAt: now,
     };
 
     await db.targets.put(updatedTarget);
     await logActivity(
-      'Exam Target Updated',
-      `Target set to ${targetPaperId} on ${targetDate || 'Unscheduled'}`,
+      editingTarget ? 'Exam Target Updated' : 'Exam Target Added',
+      `${targetPaperId} exam scheduled for ${targetDate}`,
       'plan'
     );
     setIsTargetModalOpen(false);
   };
 
   // Remove Exam Target
-  const handleRemoveTarget = async () => {
-    if (!target) return;
-    const cleared: StudentTarget = {
-      ...target,
-      nextExamDate: undefined,
-    };
-    await db.targets.put(cleared);
-    setIsTargetModalOpen(false);
+  const handleDeleteTarget = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    await db.targets.delete(id);
+    await logActivity('Exam Target Removed', `Removed target exam`, 'plan');
+    if (editingTarget?.id === id) {
+      setIsTargetModalOpen(false);
+    }
   };
+
+  // Filter & classify upcoming targets vs past targets
+  const { upcomingTargets, pastTargets } = useMemo(() => {
+    const upcoming: StudentTarget[] = [];
+    const past: StudentTarget[] = [];
+
+    allTargets.forEach((t) => {
+      const d = t.examDate || t.nextExamDate;
+      if (!d) {
+        upcoming.push(t);
+        return;
+      }
+      const days = calculateDaysRemaining(d);
+      if (days !== null && days < 0) {
+        past.push(t);
+      } else {
+        upcoming.push(t);
+      }
+    });
+
+    // Sort upcoming targets ascending: nearest exam first
+    upcoming.sort((a, b) => {
+      const dateA = a.examDate || a.nextExamDate || '9999';
+      const dateB = b.examDate || b.nextExamDate || '9999';
+      return dateA.localeCompare(dateB);
+    });
+
+    // Sort past targets descending: most recent first
+    past.sort((a, b) => {
+      const dateA = a.examDate || a.nextExamDate || '';
+      const dateB = b.examDate || b.nextExamDate || '';
+      return dateB.localeCompare(dateA);
+    });
+
+    return { upcomingTargets: upcoming, pastTargets: past };
+  }, [allTargets]);
 
   // List view filtered items
   const filteredListPlans = useMemo(() => {
@@ -283,15 +391,11 @@ export const ExamPlanner: React.FC<ExamPlannerProps> = ({
         return true;
       })
       .sort((a, b) => {
-        // Sort chronologically by dueDate then startTime
         const dateComp = a.dueDate.localeCompare(b.dueDate);
         if (dateComp !== 0) return dateComp;
         return (a.startTime || '').localeCompare(b.startTime || '');
       });
   }, [studyPlans, selectedPaperFilter, listStatusFilter]);
-
-  // Days remaining for target
-  const daysRemaining = calculateDaysRemaining(target?.nextExamDate);
 
   return (
     <div className="space-y-6">
@@ -353,80 +457,164 @@ export const ExamPlanner: React.FC<ExamPlannerProps> = ({
         </div>
       </div>
 
-      {/* Upcoming Exams Section (Compact and Clean) */}
-      <div className="bg-[#1e1e24] p-5 rounded-2xl border border-[#2a2a34] space-y-3">
+      {/* Upcoming Exams Section (Multiple Exam Targets Support) */}
+      <div className="bg-[#1e1e24] p-5 rounded-2xl border border-[#2a2a34] space-y-4">
         <div className="flex items-center justify-between pb-2 border-b border-[#2a2a34]">
           <div className="flex items-center space-x-2">
             <Target className="w-4 h-4 text-acca-red" />
             <h2 className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-              Upcoming Exam Targets
+              Upcoming Exam Targets ({upcomingTargets.length})
             </h2>
           </div>
           <button
-            onClick={() => setIsTargetModalOpen(true)}
-            className="text-xs text-acca-red hover:underline font-bold flex items-center space-x-1"
+            onClick={handleOpenAddTarget}
+            className="text-xs font-bold bg-acca-red/10 hover:bg-acca-red/20 text-acca-red border border-acca-red/30 px-3 py-1.5 rounded-xl transition-all flex items-center space-x-1.5 shadow-xs"
           >
-            <Edit2 className="w-3 h-3" />
-            <span>{target?.nextExamDate ? 'Edit Exam Target' : '+ Set Exam Target'}</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Exam</span>
           </button>
         </div>
 
+        {/* Targets Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {/* Target Card */}
-          {target && target.nextExamPaperId ? (
-            <div className="bg-[#141419] p-4 rounded-xl border border-acca-red/30 relative flex items-center justify-between">
-              <div>
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded bg-acca-red text-white">
-                    {target.nextExamPaperId}
-                  </span>
-                  <span className="text-xs font-bold text-white truncate">
-                    {version.papers.find((p) => p.id === target.nextExamPaperId)?.name || 'ACCA Paper'}
-                  </span>
-                </div>
-                <div className="text-[11px] text-gray-400">
-                  Exam Date: <span className="text-gray-200 font-semibold">{formatCalendarDate(target.nextExamDate)}</span>
-                </div>
-                {target.targetScore && (
-                  <div className="text-[10px] text-gray-500 mt-0.5">
-                    Target Score: {target.targetScore}% • {target.weeklyStudyHours || 15}h/wk
-                  </div>
-                )}
-              </div>
+          {upcomingTargets.map((t, idx) => {
+            const paperCode = t.paperId || t.nextExamPaperId || 'FR';
+            const dateStr = t.examDate || t.nextExamDate;
+            const daysLeft = calculateDaysRemaining(dateStr);
+            const isNearest = idx === 0 && daysLeft !== null && daysLeft >= 0;
 
-              <div className="text-right pl-3 border-l border-[#2a2a34]">
-                {daysRemaining !== null ? (
-                  <>
-                    <span
-                      className={`text-xl font-black block ${
-                        daysRemaining <= 14 ? 'text-acca-red' : 'text-emerald-400'
-                      }`}
-                    >
-                      {daysRemaining > 0 ? `${daysRemaining}d` : 'Today'}
-                    </span>
-                    <span className="text-[9px] font-bold text-gray-500 uppercase block">
-                      Remaining
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-[11px] text-amber-400 font-semibold block">
-                    No date set
-                  </span>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="p-4 rounded-xl bg-[#141419] border border-[#2a2a34] text-xs text-gray-400 flex items-center justify-between col-span-full">
-              <span>No active exam targets configured yet.</span>
-              <button
-                onClick={() => setIsTargetModalOpen(true)}
-                className="text-xs font-bold text-acca-red hover:underline"
+            return (
+              <div
+                key={t.id}
+                className={`p-4 rounded-xl border relative flex items-center justify-between transition-all ${
+                  isNearest
+                    ? 'bg-[#181822] border-acca-red/60 shadow-md ring-1 ring-acca-red/20'
+                    : 'bg-[#141419] border-[#2a2a34] hover:border-[#383848]'
+                }`}
               >
-                + Configure Target Date
+                <div className="min-w-0 pr-3">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-xs font-black px-2 py-0.5 rounded bg-acca-red text-white shadow-xs">
+                      {paperCode}
+                    </span>
+                    <span className="text-xs font-bold text-white truncate">
+                      {version.papers.find((p) => p.id === paperCode)?.name || paperCode}
+                    </span>
+                  </div>
+
+                  {t.sessionLabel && (
+                    <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">
+                      {t.sessionLabel}
+                    </div>
+                  )}
+
+                  <div className="text-[11px] text-gray-300">
+                    Exam Date: <span className="text-white font-semibold">{formatCalendarDate(dateStr)}</span>
+                    {t.examTime && <span className="text-gray-400 ml-1">({t.examTime})</span>}
+                  </div>
+
+                  {t.targetScore && (
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      Target Score: {t.targetScore}%
+                      {t.weeklyStudyHours ? ` • ${t.weeklyStudyHours}h/wk` : ''}
+                    </div>
+                  )}
+
+                  <div className="flex items-center space-x-3 mt-2 pt-2 border-t border-[#22222d]">
+                    <button
+                      onClick={(e) => handleOpenEditTarget(t, e)}
+                      className="text-[11px] text-gray-400 hover:text-white flex items-center space-x-1"
+                    >
+                      <Edit2 className="w-3 h-3 text-gray-500" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteTarget(t.id, e)}
+                      className="text-[11px] text-gray-500 hover:text-rose-400 flex items-center space-x-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-right pl-3 border-l border-[#2a2a34] shrink-0">
+                  {daysLeft !== null ? (
+                    <>
+                      <span
+                        className={`text-xl font-black block tracking-tight ${
+                          daysLeft <= 14 ? 'text-acca-red' : daysLeft <= 45 ? 'text-amber-400' : 'text-emerald-400'
+                        }`}
+                      >
+                        {daysLeft > 0 ? `${daysLeft}d` : 'Today'}
+                      </span>
+                      <span className="text-[9px] font-bold text-gray-400 uppercase block">
+                        Remaining
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[11px] text-amber-400 font-semibold block">
+                      No date set
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {upcomingTargets.length === 0 && (
+            <div className="p-6 rounded-xl bg-[#141419] border border-[#2a2a34] text-xs text-gray-400 flex flex-col sm:flex-row items-center justify-between gap-3 col-span-full">
+              <span>No upcoming exam targets configured yet. Configure all your planned paper dates in advance.</span>
+              <button
+                onClick={handleOpenAddTarget}
+                className="text-xs font-bold text-acca-red hover:underline shrink-0"
+              >
+                + Add Exam Target
               </button>
             </div>
           )}
         </div>
+
+        {/* Collapsible Past / Completed Targets */}
+        {pastTargets.length > 0 && (
+          <div className="pt-2 border-t border-[#252530]">
+            <button
+              onClick={() => setShowPastTargets(!showPastTargets)}
+              className="text-xs font-semibold text-gray-400 hover:text-white flex items-center space-x-1.5"
+            >
+              {showPastTargets ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              <span>Past Exam Dates ({pastTargets.length})</span>
+            </button>
+
+            {showPastTargets && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mt-2.5">
+                {pastTargets.map((t) => (
+                  <div
+                    key={t.id}
+                    className="p-3 rounded-lg bg-[#141419]/50 border border-[#22222c] text-xs text-gray-400 flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center space-x-1.5 font-bold text-gray-300">
+                        <span className="text-[10px] px-1 rounded bg-[#22222c] text-gray-400">
+                          {t.paperId || t.nextExamPaperId}
+                        </span>
+                        <span>{formatCalendarDate(t.examDate || t.nextExamDate)}</span>
+                      </div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">Exam Sitting Concluded</div>
+                    </div>
+                    <button
+                      onClick={(e) => handleDeleteTarget(t.id, e)}
+                      className="p-1 text-gray-500 hover:text-rose-400"
+                      title="Remove record"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Weekly Workload Summary */}
@@ -603,7 +791,6 @@ export const ExamPlanner: React.FC<ExamPlannerProps> = ({
 
                       {/* 7 Days Grid Cells */}
                       {weekDays.map((day) => {
-                        // Find sessions matching this day and hour
                         const cellSessions = studyPlans.filter((p) => {
                           if (p.dueDate !== day.dateStr || !p.startTime) return false;
                           const startH = parseInt(p.startTime.split(':')[0], 10);
@@ -1003,13 +1190,13 @@ export const ExamPlanner: React.FC<ExamPlannerProps> = ({
         </div>
       )}
 
-      {/* Modal: Add or Edit Exam Target */}
+      {/* Modal: Add or Edit Exam Target (Multiple Targets Supported) */}
       {isTargetModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#1e1e24] border border-[#2a2a34] rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#2a2a34]">
               <h3 className="text-base font-bold text-white">
-                Configure Exam Target
+                {editingTarget ? 'Edit Exam Target' : 'Add Exam Target'}
               </h3>
               <button
                 onClick={() => setIsTargetModalOpen(false)}
@@ -1022,12 +1209,15 @@ export const ExamPlanner: React.FC<ExamPlannerProps> = ({
             <form onSubmit={handleSaveTarget} className="space-y-4">
               <div>
                 <label className="text-xs font-semibold text-gray-400 block mb-1">
-                  Target Paper
+                  Target Paper *
                 </label>
                 <select
                   value={targetPaperId}
-                  onChange={(e) => setTargetPaperId(e.target.value)}
-                  className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-acca-red"
+                  onChange={(e) => {
+                    setTargetPaperId(e.target.value);
+                    setTargetWarning(null);
+                  }}
+                  className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-acca-red font-semibold"
                 >
                   {version.papers.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -1039,14 +1229,45 @@ export const ExamPlanner: React.FC<ExamPlannerProps> = ({
 
               <div>
                 <label className="text-xs font-semibold text-gray-400 block mb-1">
-                  Official Exam Date
+                  Official Exam Date *
                 </label>
                 <input
                   type="date"
                   value={targetDate}
-                  onChange={(e) => setTargetDate(e.target.value)}
+                  onChange={(e) => {
+                    setTargetDate(e.target.value);
+                    setTargetWarning(null);
+                  }}
                   className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-acca-red"
+                  required
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-400 block mb-1">
+                    Exam Time (Optional)
+                  </label>
+                  <input
+                    type="time"
+                    value={targetTime}
+                    onChange={(e) => setTargetTime(e.target.value)}
+                    className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-acca-red"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-400 block mb-1">
+                    Session Label (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={targetSessionLabel}
+                    onChange={(e) => setTargetSessionLabel(e.target.value)}
+                    placeholder="e.g. September 2026"
+                    className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-acca-red"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1087,19 +1308,27 @@ export const ExamPlanner: React.FC<ExamPlannerProps> = ({
                   value={targetNotes}
                   onChange={(e) => setTargetNotes(e.target.value)}
                   rows={2}
-                  placeholder="Exam sitting (e.g. December 2026), goals..."
+                  placeholder="Revision goals, specific sitting remarks..."
                   className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-acca-red resize-none"
                 />
               </div>
 
+              {targetWarning && (
+                <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-900/60 text-xs text-amber-300 flex items-start space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+                  <span>{targetWarning}</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between pt-2">
-                {target?.nextExamDate ? (
+                {editingTarget ? (
                   <button
                     type="button"
-                    onClick={handleRemoveTarget}
-                    className="text-xs text-rose-400 hover:underline"
+                    onClick={(e) => handleDeleteTarget(editingTarget.id, e)}
+                    className="text-xs text-rose-400 hover:underline flex items-center space-x-1"
                   >
-                    Remove Target Date
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Target</span>
                   </button>
                 ) : (
                   <div />
@@ -1117,7 +1346,7 @@ export const ExamPlanner: React.FC<ExamPlannerProps> = ({
                     type="submit"
                     className="px-4 py-2 rounded-xl text-xs font-bold bg-acca-red hover:bg-acca-red-hover text-white transition-all shadow-xs"
                   >
-                    Save Target
+                    {editingTarget ? 'Save Changes' : 'Save Target'}
                   </button>
                 </div>
               </div>

@@ -173,7 +173,8 @@ export function parseMarkdownChecklist(
       continue;
     }
 
-    // Plain text / paragraph note
+    // Plain text / line-based question item
+    totalTasks++;
     items.push({
       paperId: currentPaper,
       syllabusArea: currentSyllabusArea || undefined,
@@ -188,12 +189,12 @@ export function parseMarkdownChecklist(
   }
 
   if (items.length === 0) {
-    warnings.push('No checklist items or headings could be extracted from the markdown input.');
+    warnings.push('No checklist items or headings could be extracted from the input.');
   }
 
   return {
     paperCode: currentPaper,
-    detectedTitle: detectedTitle || `${currentPaper} Study Checklist`,
+    detectedTitle: detectedTitle || `${currentPaper} Question Checklist`,
     items,
     totalTasks,
     completedTasks,

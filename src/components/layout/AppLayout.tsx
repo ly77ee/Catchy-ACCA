@@ -119,7 +119,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       items: [
         { id: 'checklist', label: 'Question Checklist', icon: CheckSquare },
         { id: 'study-materials', label: 'Study Materials', icon: BookOpen },
-        { id: 'exam-environment', label: 'Mock Exams', icon: FileCheck },
         { id: 'excel', label: 'Excel', icon: Table2 },
         { id: 'word', label: 'Word', icon: PenTool },
       ],

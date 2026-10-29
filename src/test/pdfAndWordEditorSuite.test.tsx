@@ -473,8 +473,8 @@ describe('Catchy ACCA: PDF Viewer Continuous Scroll & Word Editor Suite', () => 
   /* -------------------------------------------------------------------------- */
   /* 5. SIDEBAR NAVIGATION CLEANUP & MOCK EXAMS RENAMING                        */
   /* -------------------------------------------------------------------------- */
-  describe('5. Sidebar Navigation Cleanup & Mock Exams Renaming', () => {
-    it('sidebar displays Mock Exams destination and has no standalone Questions item', () => {
+  describe('5. Sidebar Navigation Cleanup & Mock Exams Removal', () => {
+    it('sidebar has removed Mock Exams destination and has no standalone Questions item', () => {
       const onNavigate = vi.fn();
       render(
         <AppLayout
@@ -491,16 +491,11 @@ describe('Catchy ACCA: PDF Viewer Continuous Scroll & Word Editor Suite', () => 
         </AppLayout>
       );
 
-      // Verify Mock Exams is present in the sidebar
-      expect(screen.getByText('Mock Exams')).toBeDefined();
+      // Verify Mock Exams is removed from the sidebar
+      expect(screen.queryByText('Mock Exams')).toBeNull();
 
       // Verify Questions navigation item is removed from sidebar
       expect(screen.queryByRole('button', { name: /^Questions$/i })).toBeNull();
-
-      // Click Mock Exams navigates to 'exam-environment'
-      const mockExamsBtn = screen.getByText('Mock Exams');
-      fireEvent.click(mockExamsBtn);
-      expect(onNavigate).toHaveBeenCalledWith('exam-environment');
     });
 
     it('Mock Exams environment exposes Question Bank & Authoring entry point', () => {

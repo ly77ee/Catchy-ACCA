@@ -229,12 +229,9 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
             <div>
               <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
                 Question Checklist
-                <span className="text-[11px] font-semibold bg-[#141419] text-gray-400 px-2 py-0.5 rounded-md border border-[#2a2a34]">
-                  Obsidian Markdown Compatible
-                </span>
               </h1>
               <p className="text-xs text-gray-400 mt-0.5">
-                Paste structured Markdown checklists, track syllabus completion, and organize exam revision
+                Write or paste your questions, one per line. Each line can become a checklist item.
               </p>
             </div>
           </div>
@@ -247,14 +244,14 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
             className="flex items-center space-x-1.5 px-3 py-2 bg-acca-red hover:bg-acca-red-hover text-white rounded-xl text-xs font-bold transition-all shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Paste Markdown Checklist</span>
+            <span>Create Checklist</span>
           </button>
 
           {activeChecklist && (
             <button
               onClick={handleExportMarkdown}
               className="flex items-center space-x-1.5 px-3 py-2 bg-[#141419] hover:bg-[#25252e] text-gray-300 hover:text-white rounded-xl text-xs font-semibold border border-[#2a2a34] transition-all"
-              title="Copy checklist back to clipboard as Obsidian-compatible Markdown"
+              title="Copy checklist back to clipboard as Markdown"
             >
               {copiedStatus ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
               <span>{copiedStatus ? 'Copied Markdown!' : 'Export Markdown'}</span>
@@ -315,7 +312,7 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
                 })
               ) : (
                 <div className="p-4 text-center text-xs text-gray-500">
-                  No checklists yet. Click "Paste Markdown Checklist" above.
+                  No checklists yet. Click "Create Checklist" above.
                 </div>
               )}
             </div>
@@ -548,7 +545,7 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
               <div>
                 <h3 className="text-base font-bold text-white">No Checklist Selected</h3>
                 <p className="text-xs text-gray-400 max-w-md mx-auto mt-1">
-                  Paste a Markdown study checklist inspired by Obsidian to track topics, question papers, and revision goals.
+                  Write or paste your questions, one per line, to track topics, question papers, and revision goals.
                 </p>
               </div>
               <button
@@ -556,14 +553,14 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
                 className="px-4 py-2 bg-acca-red hover:bg-acca-red-hover text-white rounded-xl text-xs font-bold transition-all inline-flex items-center space-x-2"
               >
                 <Plus className="w-4 h-4" />
-                <span>Paste Markdown Checklist</span>
+                <span>Create Checklist</span>
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Paste Markdown Import Modal */}
+      {/* Create Checklist Modal */}
       {isImportModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
           <div className="bg-[#1e1e24] border border-[#2a2a34] rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
@@ -571,10 +568,10 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
               <div>
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
                   <CheckSquare className="w-4 h-4 text-acca-red" />
-                  Paste Markdown Question Checklist
+                  Create Question Checklist
                 </h2>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Paste Obsidian Markdown checklist with headings (# Paper, ## Section) and checkboxes (- [ ] Question)
+                  Type each question on a new line, then create your checklist.
                 </p>
               </div>
               <button
@@ -624,16 +621,16 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-bold text-gray-300">
-                    Markdown Content
+                    Questions & Tasks
                   </label>
                   <button
                     type="button"
                     onClick={() => {
-                      setPasteMarkdown(`# ${selectedPaperForImport}\n\n## Group Accounting\n- [ ] Q1 - Goodwill and NCI\n- [ ] Q2 - Associates\n- [x] Q3 - Consolidated SFP\n\n## Financial Instruments\n- [ ] Q4 - Classification and measurement\n- [ ] Q5 - Hedge accounting`);
+                      setPasteMarkdown(`Q1 - Goodwill and NCI\nQ2 - Associates and Joint Arrangements\nQ3 - Consolidated Financial Statements\nQ4 - Financial Instruments\nQ5 - Revenue Recognition`);
                     }}
                     className="text-[11px] text-acca-red hover:underline font-semibold"
                   >
-                    Load ACCA Sample Markdown
+                    Load Sample Questions
                   </button>
                 </div>
 
@@ -641,7 +638,7 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
                   rows={12}
                   value={pasteMarkdown}
                   onChange={e => setPasteMarkdown(e.target.value)}
-                  placeholder={`# SBR\n\n## Group accounting\n- [ ] Q1 - Goodwill and non-controlling interests\n- [ ] Q2 - Associates and joint ventures\n- [x] Q3 - Consolidated statement of financial position\n\n## Financial instruments\n- [ ] Q4 - Classification and measurement\n- [ ] Q5 - Hedge accounting`}
+                  placeholder="Enter one question or task per line..."
                   className="w-full font-mono text-xs bg-[#141419] border border-[#2a2a34] rounded-xl p-3 text-white placeholder-gray-600 focus:outline-none focus:border-acca-red"
                 />
               </div>
@@ -650,7 +647,7 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
               {pasteMarkdown.trim() && (
                 <div className="bg-[#141419] border border-[#2a2a34] rounded-xl p-3.5 space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-gray-300">Pre-Import Analysis:</span>
+                    <span className="font-bold text-gray-300">Checklist Preview:</span>
                     {(() => {
                       const analysis = parseMarkdownChecklist(pasteMarkdown, selectedPaperForImport);
                       return (
@@ -682,7 +679,7 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
                   disabled={!pasteMarkdown.trim()}
                   className="px-4 py-2 bg-acca-red hover:bg-acca-red-hover disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
                 >
-                  Import Checklist Tasks
+                  Create Checklist
                 </button>
               </div>
             </div>

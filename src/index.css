@@ -131,6 +131,35 @@
   font-size: 11px !important;
 }
 
+.catchy-spreadsheet-host .luckysheet-scrollbar-x {
+  height: 12px !important;
+  bottom: 0px !important;
+  z-index: 1004 !important;
+  background-color: rgba(20, 20, 25, 0.85) !important;
+}
+
+.catchy-spreadsheet-host .luckysheet-scrollbar-x::-webkit-scrollbar {
+  height: 10px !important;
+}
+
+.catchy-spreadsheet-host .luckysheet-scrollbar-x::-webkit-scrollbar-track {
+  background-color: #1a1a22 !important;
+}
+
+.catchy-spreadsheet-host .luckysheet-scrollbar-x::-webkit-scrollbar-thumb {
+  background-color: #4a4a5a !important;
+  border-radius: 6px !important;
+}
+
+.catchy-spreadsheet-host .luckysheet-scrollbar-x::-webkit-scrollbar-thumb:hover {
+  background-color: #656578 !important;
+}
+
+.catchy-spreadsheet-host .luckysheet-scrollbar-y::-webkit-scrollbar-thumb {
+  background-color: #4a4a5a !important;
+  border-radius: 6px !important;
+}
+
 /* ==========================================================================
    ACCA CBE Word Editor / Tiptap Table & Formatting Styles
    ========================================================================== */

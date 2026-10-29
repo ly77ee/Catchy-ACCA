@@ -86,7 +86,7 @@ describe('Catchy ACCA: Unified Sidebar, Shared Materials & Full-Screen Workspace
       expect(screen.getByText('Home')).toBeDefined();
       expect(screen.getByText('My ACCA')).toBeDefined();
       expect(screen.getByText('Study Materials')).toBeDefined();
-      expect(screen.getByText('Mock Exams')).toBeDefined();
+      expect(screen.queryByText('Mock Exams')).toBeNull();
       expect(screen.queryByRole('button', { name: /^Questions$/i })).toBeNull();
       expect(screen.getByText('Excel')).toBeDefined();
       expect(screen.getByText('Word')).toBeDefined();

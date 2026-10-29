@@ -63,8 +63,8 @@ export function createDefaultFortuneSheets(paperId: string = 'FR', title?: strin
       id: 'sheet-1',
       status: 1,
       order: 0,
-      row: 35,
-      column: 14,
+      row: 80,
+      column: 80,
       celldata: [
         {
           r: 0,
@@ -97,8 +97,8 @@ export function createDefaultFortuneSheets(paperId: string = 'FR', title?: strin
       id: 'sheet-2',
       status: 0,
       order: 1,
-      row: 35,
-      column: 14,
+      row: 80,
+      column: 80,
       celldata: [
         { r: 0, c: 0, v: { v: 'Accounting Notes & Basis of Preparation', m: 'Accounting Notes & Basis of Preparation', bl: 1 } },
         { r: 2, c: 0, v: { v: 'Standard', m: 'Standard', bl: 1 } },
@@ -167,8 +167,8 @@ export function spreadsheetWorkbookToFortuneSheets(wb: SpreadsheetWorkbook): For
       id: sheet.id || `sheet-${idx + 1}`,
       status: idx === (wb.activeSheetIndex || 0) ? 1 : 0,
       order: idx,
-      row: Math.max(sheet.rowCount || 35, 35),
-      column: Math.max(sheet.colCount || 14, 14),
+      row: Math.max(sheet.rowCount || 80, 80),
+      column: Math.max(sheet.colCount || 80, 80),
       celldata
     };
   });

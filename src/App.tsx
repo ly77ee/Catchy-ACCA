@@ -120,6 +120,7 @@ export const App: React.FC = () => {
           version={activeVersion}
           paperRecords={paperRecordsMap}
           target={currentTarget}
+          targets={targets || []}
           studyPlans={studyPlans || []}
           activityLogs={activityLogs || []}
           questions={questions || []}
@@ -267,6 +268,7 @@ export const App: React.FC = () => {
         <ExamPlanner
           version={activeVersion}
           target={currentTarget}
+          targets={targets || []}
           studyPlans={studyPlans || []}
           allQuestions={questions || []}
           studyMaterials={studyMaterials || []}

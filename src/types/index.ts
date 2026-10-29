@@ -62,11 +62,17 @@ export interface StudentPaperRecord {
 
 export interface StudentTarget {
   id: string;
-  nextExamPaperId?: string;
-  nextExamDate?: string;
+  paperId?: string;
+  nextExamPaperId?: string; // backwards compatibility
+  examDate?: string; // YYYY-MM-DD
+  nextExamDate?: string; // backwards compatibility
+  examTime?: string; // HH:mm e.g. "09:00"
+  sessionLabel?: string; // e.g. "September 2026", "December 2026"
   targetScore?: number;
   weeklyStudyHours?: number;
   notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface StudyPlanItem {

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Calendar,
   CheckCircle2,
@@ -34,6 +35,7 @@ interface DashboardProps {
   version: QualificationVersion;
   paperRecords: Record<string, StudentPaperRecord>;
   target: StudentTarget | null;
+  targets?: StudentTarget[];
   studyPlans: StudyPlanItem[];
   activityLogs: ActivityLog[];
   questions?: QuestionRecord[];
@@ -46,6 +48,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   version,
   paperRecords,
   target,
+  targets: propTargets,
   studyPlans,
   activityLogs,
   questions = [],
@@ -55,6 +58,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const summary = calculateProgressSummary(version, paperRecords);
 
+  // Targets query & nearest upcoming target computation
+  const liveTargets = useLiveQuery(() => db.targets.toArray(), [], []);
+  const allTargets = useMemo(() => {
+    if (liveTargets && liveTargets.length > 0) return liveTargets;
+    if (propTargets && propTargets.length > 0) return propTargets;
+    return target && (target.nextExamPaperId || target.paperId) ? [target] : [];
+  }, [liveTargets, propTargets, target]);
+
+  const upcomingTargets = useMemo(() => {
+    return allTargets
+      .filter((t) => {
+        const d = t.examDate || t.nextExamDate;
+        if (!d) return false;
+        const days = calculateDaysRemaining(d);
+        return days !== null && days >= 0;
+      })
+      .sort((a, b) => {
+        const dateA = a.examDate || a.nextExamDate || '9999';
+        const dateB = b.examDate || b.nextExamDate || '9999';
+        return dateA.localeCompare(dateB);
+      });
+  }, [allTargets]);
+
+  const activeTarget = upcomingTargets[0] || allTargets[0] || target;
+  const activePaperCode = activeTarget?.paperId || activeTarget?.nextExamPaperId || 'FR';
+  const activeExamDate = activeTarget?.examDate || activeTarget?.nextExamDate || '';
+  const daysRemaining = calculateDaysRemaining(activeExamDate);
+  const nextExamPaper = version.papers.find((p) => p.id === activePaperCode);
+
   // Today's Study Plan state
   const [newPlanText, setNewPlanText] = useState('');
   const [newPlanPaperId, setNewPlanPaperId] = useState('FR');
@@ -62,13 +94,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Next Exam edit modal
   const [isEditingTarget, setIsEditingTarget] = useState(false);
-  const [targetPaperId, setTargetPaperId] = useState(target?.nextExamPaperId || 'FR');
-  const [targetDate, setTargetDate] = useState(target?.nextExamDate || '');
-  const [targetScore, setTargetScore] = useState(target?.targetScore || 70);
-  const [weeklyHours, setWeeklyHours] = useState(target?.weeklyStudyHours || 15);
+  const [targetPaperId, setTargetPaperId] = useState(activePaperCode);
+  const [targetDate, setTargetDate] = useState(activeExamDate);
+  const [targetScore, setTargetScore] = useState(activeTarget?.targetScore || 70);
+  const [weeklyHours, setWeeklyHours] = useState(activeTarget?.weeklyStudyHours || 15);
 
-  const daysRemaining = calculateDaysRemaining(target?.nextExamDate);
-  const nextExamPaper = version.papers.find(p => p.id === target?.nextExamPaperId);
+  const handleOpenEditTarget = () => {
+    setTargetPaperId(activePaperCode);
+    setTargetDate(activeExamDate);
+    setTargetScore(activeTarget?.targetScore || 70);
+    setWeeklyHours(activeTarget?.weeklyStudyHours || 15);
+    setIsEditingTarget(true);
+  };
 
   // Add study plan item
   const handleAddPlan = async (e: React.FormEvent) => {
@@ -112,13 +149,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const handleSaveTarget = async (e: React.FormEvent) => {
     e.preventDefault();
+    const targetToUpdate = activeTarget || target;
+    const now = new Date().toISOString();
     const updated: StudentTarget = {
-      id: target?.id || 'default',
+      id: targetToUpdate?.id || 'target-default',
+      paperId: targetPaperId,
       nextExamPaperId: targetPaperId,
+      examDate: targetDate.trim() || undefined,
       nextExamDate: targetDate.trim() || undefined,
       targetScore: Number(targetScore) || 70,
       weeklyStudyHours: Number(weeklyHours) || 15,
-      notes: target?.notes || ''
+      sessionLabel: targetToUpdate?.sessionLabel,
+      examTime: targetToUpdate?.examTime,
+      notes: targetToUpdate?.notes || '',
+      createdAt: targetToUpdate?.createdAt || now,
+      updatedAt: now,
     };
     await db.targets.put(updated);
     await logActivity(
@@ -189,7 +234,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             Study Manager & Dashboard
           </h1>
           <p className="text-xs text-gray-400 mt-1 max-w-2xl leading-relaxed">
-            Track your ACCA qualification journey, manage your Obsidian Markdown study checklists, and practise structured exam simulations.
+            Track your ACCA qualification journey, manage your question checklists, and review progress.
           </p>
         </div>
 
@@ -287,14 +332,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="flex items-center gap-2">
                 <CheckSquare className="w-4 h-4 text-acca-red" />
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Markdown Question Checklist
+                  Question Checklist
                 </h2>
               </div>
-              <span className="text-[11px] text-gray-400">Obsidian Compatible</span>
+              <span className="text-[11px] text-gray-400">Syllabus Tracker</span>
             </div>
 
             <p className="text-xs text-gray-300 leading-relaxed">
-              Paste and track your syllabus checklist using standard Markdown checkboxes (<code className="text-acca-red bg-[#141419] px-1 rounded">- [ ]</code> and <code className="text-emerald-400 bg-[#141419] px-1 rounded">- [x]</code>). Preserves syllabus hierarchy, item ordering, and progress offline.
+              Write or paste your questions, one per line. Each line becomes a trackable checklist item with offline persistence.
             </p>
 
             <div className="pt-2 flex flex-wrap items-center gap-3">
@@ -303,7 +348,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 className="px-4 py-2 bg-acca-red hover:bg-acca-red-hover text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center space-x-1.5"
               >
                 <Plus className="w-4 h-4" />
-                <span>Paste or View Checklist</span>
+                <span>Create or View Checklist</span>
               </button>
 
               <button
@@ -397,20 +442,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <span>Next Scheduled Exam</span>
               </span>
               <button
-                onClick={() => setIsEditingTarget(true)}
+                onClick={handleOpenEditTarget}
                 className="text-xs font-semibold text-acca-red hover:underline flex items-center gap-1"
               >
                 <Edit3 className="w-3 h-3" />
-                <span>{target?.nextExamDate ? 'Edit Date' : 'Set Date'}</span>
+                <span>{activeExamDate ? 'Edit Date' : 'Set Date'}</span>
               </button>
             </div>
 
-            {target?.nextExamDate ? (
+            {activeExamDate ? (
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div>
                     <span className="text-2xl font-black text-white tracking-tight">
-                      {target.nextExamPaperId}
+                      {activePaperCode}
                     </span>
                     <h3 className="text-xs font-semibold text-gray-300">
                       {nextExamPaper?.name || 'Selected Paper'}
@@ -435,9 +480,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="text-xs text-gray-400 flex items-center justify-between pt-1 border-t border-[#2a2a34]">
                   <span>Exam Session Date:</span>
                   <span className="font-semibold text-white">
-                    {formatCalendarDate(target.nextExamDate)}
+                    {formatCalendarDate(activeExamDate)}
                   </span>
                 </div>
+
+                {upcomingTargets.length > 1 && (
+                  <div className="pt-1 text-right">
+                    <button
+                      onClick={() => onNavigate('exam-planner')}
+                      className="text-[11px] text-gray-400 hover:text-acca-red font-medium transition-colors"
+                    >
+                      +{upcomingTargets.length - 1} more scheduled exam{upcomingTargets.length > 2 ? 's' : ''} in Planner →
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="py-4 text-center space-y-2">
@@ -445,7 +501,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   No upcoming exam session configured.
                 </p>
                 <button
-                  onClick={() => setIsEditingTarget(true)}
+                  onClick={handleOpenEditTarget}
                   className="px-3 py-1.5 bg-[#141419] hover:bg-[#25252e] border border-[#2a2a34] text-xs font-semibold text-white rounded-lg transition-colors"
                 >
                   Configure Next Exam Date
