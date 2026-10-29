@@ -4,7 +4,13 @@ export type PaperStatus = 'not_started' | 'in_progress' | 'passed' | 'exempt';
 
 export type QuestionStatus = 'not_started' | 'attempted' | 'completed' | 'needs_review';
 
-export type QuestionType = 'section_a_mcq' | 'section_b_case' | 'section_c_constructed' | 'other';
+export type QuestionType =
+  | 'section_a_mcq'
+  | 'section_b_case'
+  | 'section_c_constructed'
+  | 'calculation'
+  | 'multi_select'
+  | 'other';
 
 export interface PaperConfig {
   id: string; // e.g. 'BT', 'FR', 'SBL'
@@ -68,7 +74,7 @@ export interface ActivityLog {
   timestamp: string;
   title: string;
   description: string;
-  category: 'paper' | 'question' | 'document' | 'plan' | 'backup';
+  category: 'paper' | 'question' | 'document' | 'plan' | 'backup' | 'exam';
 }
 
 export interface StudyMaterial {
@@ -81,6 +87,19 @@ export interface StudyMaterial {
   tags: string[];
   addedAt: string;
   pdfData?: Blob | ArrayBuffer; // Stored in IndexedDB
+}
+
+export interface QuestionOption {
+  id: string; // e.g. 'A', 'B', 'C', 'D'
+  label: string; // e.g. 'A'
+  text: string;
+}
+
+export interface SubQuestion {
+  id: string;
+  label: string; // e.g. '(a)'
+  prompt: string;
+  marks?: number;
 }
 
 export interface QuestionAttempt {
@@ -99,6 +118,7 @@ export interface QuestionRecord {
   paperId: string;
   sourceMaterialId?: string; // Link to StudyMaterial.id
   sourcePage?: number;
+  sourcePageEnd?: number;
   topicTags: string[];
   questionType: QuestionType;
   notes: string;
@@ -106,8 +126,79 @@ export interface QuestionRecord {
   isDoubt: boolean;
   confidenceRating: number; // 1 to 5
   attempts: QuestionAttempt[];
+  options?: QuestionOption[]; // Objective options
+  correctOptionIds?: string[]; // Correct answer key for auto-marking
+  availableMarks?: number; // e.g. 2, 10, 20
+  subQuestions?: SubQuestion[];
+  markingGuide?: string; // Solution guide / rationale
+  extractedFromPdf?: boolean;
+  needsReview?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+// Phase 2: Exam Simulator Types
+export type ExamMode = 'timed' | 'untimed';
+export type FeedbackMode = 'immediate' | 'delayed';
+export type QuestionOrdering = 'sequential' | 'randomized' | 'by_topic';
+
+export interface ExamConfig {
+  paperId: string;
+  sourceMaterialId?: string;
+  selectedQuestionIds?: string[];
+  topicFilters?: string[];
+  questionTypeFilter?: 'all' | 'objective' | 'written' | 'calculation';
+  questionCount: number;
+  ordering: QuestionOrdering;
+  mode: ExamMode;
+  durationMinutes?: number;
+  feedbackMode: FeedbackMode;
+}
+
+export interface StudentExamResponse {
+  questionId: string;
+  selectedOptionIds?: string[]; // For objective single/multi select
+  writtenAnswer?: string; // For essay or calculation
+  isFlaggedForReview: boolean;
+  marksAwarded?: number;
+  isAutoMarked?: boolean;
+  answeredAt?: string;
+}
+
+export interface ExamAttemptRecord {
+  id: string;
+  paperId: string;
+  startedAt: string;
+  completedAt?: string;
+  totalTimeSeconds: number;
+  config: ExamConfig;
+  questionIds: string[];
+  responses: Record<string, StudentExamResponse>;
+  totalMarksAvailable: number;
+  totalMarksScored: number;
+  scorePercentage: number;
+  status: 'in_progress' | 'completed' | 'abandoned';
+}
+
+// Extraction Types
+export interface ExtractedQuestionDraft {
+  tempId: string;
+  questionNumber: string;
+  title: string;
+  prompt: string;
+  paperId: string;
+  sourcePageStart: number;
+  sourcePageEnd: number;
+  sourceMaterialId: string;
+  questionType: QuestionType;
+  options: QuestionOption[];
+  correctOptionIds: string[];
+  availableMarks: number;
+  topicSuggestions: string[];
+  markingGuide?: string;
+  confidenceScore: number; // 0-1
+  warningMessages: string[];
+  isApproved: boolean;
 }
 
 export interface BackupPayload {
@@ -121,4 +212,5 @@ export interface BackupPayload {
   studyPlans: StudyPlanItem[];
   targets: StudentTarget[];
   activityLogs: ActivityLog[];
+  examAttempts?: ExamAttemptRecord[];
 }

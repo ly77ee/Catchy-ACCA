@@ -290,10 +290,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
 
-          <div className="pt-4 border-t border-gray-100 mt-4">
+          <div className="pt-4 border-t border-gray-100 mt-4 space-y-2">
+            <button
+              onClick={() => onNavigate('exam-environment')}
+              className="w-full text-xs font-bold text-white bg-neutral-900 hover:bg-black py-2 rounded-xl flex items-center justify-center space-x-1.5 transition-colors shadow-xs"
+            >
+              <Award className="w-3.5 h-3.5 text-acca-red" />
+              <span>Practise in CBE Simulator</span>
+            </button>
             <button
               onClick={() => onNavigate('my-acca')}
-              className="w-full text-xs font-semibold text-gray-700 hover:text-acca-red flex items-center justify-center space-x-1 py-1"
+              className="w-full text-xs font-semibold text-gray-500 hover:text-acca-red flex items-center justify-center space-x-1 py-1"
             >
               <span>Manage all 13 papers in My ACCA</span>
               <ChevronRight className="w-4 h-4" />

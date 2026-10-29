@@ -9,13 +9,17 @@ import {
   Filter,
   Search,
   AlertTriangle,
-  HardDrive
+  HardDrive,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
-import { StudyMaterial, QualificationVersion } from '../../types';
+import { StudyMaterial, QualificationVersion, ExtractedQuestionDraft } from '../../types';
 import { db, logActivity } from '../../db';
 import { PdfViewer } from './PdfViewer';
 import { EmptyState } from '../common/EmptyState';
 import { Modal } from '../common/Modal';
+import { ExtractionReviewModal } from '../extraction/ExtractionReviewModal';
+import { extractQuestionsFromPdf } from '../../utils/pdfExtractor';
 import * as pdfjsLib from 'pdfjs-dist';
 
 interface StudyMaterialsProps {
@@ -24,6 +28,7 @@ interface StudyMaterialsProps {
   selectedMaterialId?: string | null;
   targetPage?: number;
   onClearSelectedMaterial?: () => void;
+  onQuestionsExtracted?: () => void;
 }
 
 export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
@@ -59,6 +64,46 @@ export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
   const [isProcessingFile, setIsProcessingFile] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Extraction states
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractingTitle, setExtractingTitle] = useState('');
+  const [extractionDrafts, setExtractionDrafts] = useState<ExtractedQuestionDraft[]>([]);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [extractionWarning, setExtractionWarning] = useState<string | null>(null);
+
+  const handleStartExtraction = async (material: StudyMaterial) => {
+    setIsExtracting(true);
+    setExtractingTitle(material.title);
+    setExtractionWarning(null);
+
+    try {
+      // Scan up to 25 pages
+      const result = await extractQuestionsFromPdf(material, 1, 25);
+      setIsExtracting(false);
+
+      if (result.isScannedOrEmptyText) {
+        alert(
+          'Diagnostic Alert: This PDF appears to be a scanned image-only document without an embedded text layer. Automated extraction could not detect selectable text.'
+        );
+        return;
+      }
+
+      if (result.questions.length === 0) {
+        alert(
+          'No formatted questions were identified in the scanned pages. You can add question records manually in the Question Manager.'
+        );
+        return;
+      }
+
+      setExtractionDrafts(result.questions);
+      setIsReviewOpen(true);
+    } catch (err: any) {
+      setIsExtracting(false);
+      console.error('Extraction error:', err);
+      alert('Extraction failed: ' + err.message);
+    }
+  };
 
   // File size formatter
   const formatBytes = (bytes: number): string => {
@@ -288,16 +333,29 @@ export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between pt-4 mt-4 border-t border-gray-100">
-                    <button
-                      onClick={() => {
-                        setActiveViewerMaterial(material);
-                        setViewerPage(1);
-                      }}
-                      className="text-xs font-bold text-acca-red hover:text-acca-red-dark flex items-center space-x-1"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Open Document</span>
-                    </button>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => {
+                          setActiveViewerMaterial(material);
+                          setViewerPage(1);
+                        }}
+                        className="text-xs font-bold text-gray-700 hover:text-acca-red flex items-center space-x-1"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Open</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleStartExtraction(material)}
+                        disabled={isExtracting}
+                        className="text-xs font-bold text-acca-red hover:text-acca-red-dark flex items-center space-x-1 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg transition-colors"
+                        title="Extract questions, options, and topics from this PDF"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Extract Questions</span>
+                      </button>
+                    </div>
+
                     <button
                       onClick={() => handleDeleteMaterial(material.id, material.title)}
                       className="text-gray-300 hover:text-red-500 p-1 transition-colors"
@@ -410,6 +468,37 @@ export const StudyMaterials: React.FC<StudyMaterialsProps> = ({
               </div>
             </form>
           </Modal>
+
+          {/* Extraction In-Progress Loading Modal */}
+          {isExtracting && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
+              <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4 text-center space-y-4 border border-gray-100">
+                <div className="w-12 h-12 bg-red-50 text-acca-red rounded-full flex items-center justify-center mx-auto animate-pulse">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">Extracting Questions & Syllabus Topics</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Analyzing pages in <strong>{extractingTitle}</strong>...
+                  </p>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-acca-red h-full w-2/3 animate-indeterminate" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Extraction Review Screen */}
+          <ExtractionReviewModal
+            isOpen={isReviewOpen}
+            onClose={() => setIsReviewOpen(false)}
+            drafts={extractionDrafts}
+            materialTitle={extractingTitle}
+            onQuestionsSaved={() => {
+              // Questions are saved to DB
+            }}
+          />
         </>
       )}
     </div>

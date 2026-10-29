@@ -6,56 +6,61 @@
 
 ## 📖 Product Objective
 
-**Catchy ACCA** is designed to give ACCA students a dedicated, private, and distraction-free workspace on their computer. Students can track their qualification progress, import their study materials, organize past exam questions, flag doubts, and prepare systematically for upcoming exam sessions.
+**Catchy ACCA** gives ACCA students a dedicated, private, and distraction-free workspace on their computer. Students can track their qualification progress, import their study materials, extract questions intelligently, practise in a faithful CBE exam simulator, flag doubts, and prepare systematically for upcoming exam sessions.
 
-All documents, questions, and personal notes remain **100% on your device** in local browser storage (IndexedDB). No cloud account, third-party login, or paid AI subscription is required to use the core application.
+All documents, questions, exam responses, and notes remain **100% on your device** in local browser storage (IndexedDB). No cloud account, third-party login, or paid AI subscription is required to use the core application.
 
 ---
 
 ## 🎨 Visual Identity & Principles
 
-- **ACCA-Inspired Palette:** High-contrast professional black (`#141419`), charcoal (`#1e1e24`), crisp white, and ACCA signature red (`#c00000`).
-- **Circular Progress Indicators:** Circular rings showing overall qualification completion and individual paper statuses.
+- **ACCA-Inspired Palette:** High-contrast professional black (`#141419`), charcoal slate (`#1e1e24`), crisp white, and ACCA signature red (`#c00000`).
+- **Circular Progress Indicators:** Circular rings showing overall qualification completion, individual paper progress, and exam simulation scores.
 - **Typographic Wordmark:** Distinctive **Catchy ACCA** typographic wordmark with creator credit **by ly77ee**.
-- **No Mock Functionality:** Features are implemented with genuine functionality or clearly labeled with roadmap notes for future phases.
+- **Honest Engineering:** Features are implemented with genuine functionality or clearly labeled with roadmap notes for future phases. Never pretends to auto-grade open essays without an official marking guide.
 
 ---
 
-## ✨ Phase 1 Features
+## ✨ Features Overview
 
-### 1. Main Dashboard
-- **Overall ACCA Progress Ring:** Live circular indicator calculating progress towards qualifying (out of 13 exams).
-- **Summary Metrics:** Real-time counts for Passed, In-Progress, Exempt, and Remaining papers.
-- **Qualification Stage Breakdown:** Progress through Applied Knowledge (3), Applied Skills (6), Strategic Professional Essentials (2), Strategic Professional Options (2), and EPSM.
-- **Subject-Wise Paper Grid:** Visual cards for each ACCA paper with individual circular progress indicators and quick status updates.
-- **Next Exam Countdown:** Real student-entered exam target showing countdown in days, scheduled date, and target score.
-- **Today's Study Plan:** Interactive daily task checklist with time estimates and completion checkboxes.
-- **Global Search:** Top search bar allowing instant searching across papers, questions, and imported documents.
-- **Recent Activity Feed:** Real-time log of exam updates, questions logged, and documents imported.
+### Phase 1: Foundation
+- **Main Dashboard:** Live circular progress indicator calculating overall qualification completion (out of 13 exams), stage-wise progress, subject-wise paper grid, daily study checklist, next-exam countdown, and global search.
+- **ACCA Qualification Configuration:** Centralized and versioned qualification definitions (`current_2024_2026` and `redesigned_future`) guaranteeing permanent preservation of passes, exemptions, and notes across framework views.
+- **Local PDF Study Materials Library:** Fast in-browser canvas rendering with page navigation, zoom, and metadata.
+- **Question Manager:** Comprehensive logging with topic tags, doubt flags, confidence ratings, and direct jumping to PDF pages.
+- **Persistence & Backup:** Relational IndexedDB storage via Dexie.js with JSON export/import and pre-flight validation.
 
-### 2. ACCA Qualification Configuration
-- **Centralized & Versioned Data:** Paper names, codes, stages, and requirements are defined in `src/config/accaStructure.ts` rather than scattered in code.
-- **Version Switcher:** Toggle between **Current Professional Qualification (2024–2026)** and **Evolved Qualification (Announced Framework)**.
-- **Transition Rule Guarantee:** All passed exams, exemptions, and historical notes are permanently preserved when switching syllabus frameworks.
+### Phase 2: Question Intelligence & Exam Simulator
+- **Intelligent Question Extraction:**
+  - Extracts question numbers, titles, prompts, subquestions, marks, options, and answer keys from imported study PDFs.
+  - Automatically detects scanned/image-only PDFs lacking an embedded text layer and alerts the user with helpful diagnostics.
+- **Interactive Review Screen (`ExtractionReviewModal`):**
+  - Allows students to review, edit, approve, or correct extracted questions, options, page references, and answer keys before importing them.
+  - Never silently invents missing questions or answers.
+- **Syllabus Topic Intelligence:**
+  - Analyzes extracted question text against official ACCA syllabus taxonomies (e.g., IFRS 15, IFRS 16, IAS 36, Consolidation, ABC, Variances, ISA 315).
+  - Recommends topic tags with keyword match density. Students can approve, edit, or reject suggestions.
+- **CBE Exam Simulator (`ExamEnvironment`):**
+  - **Setup Screen:** Configure paper, source document, topic filters, question format filters, question count, ordering (sequential, randomized, by topic), timer mode (timed or untimed), and solution feedback (immediate or delayed).
+  - Only offers question formats supported by the selected material.
+  - **Live Exam Delivery:** Focused interface with single question display, question navigator (answered, unanswered, current, flagged), flag-for-review toggle, live countdown timer with low-time visual alerts, and autosaved responses.
+  - **Results & Debrief:** Score percentage, marks awarded, question-by-question review, official answer keys, and marking guide explanations.
+- **Attempt History:**
+  - Stores completed simulations in IndexedDB with time spent, marks, responses, and review flags.
+  - Automatically synchronizes with Dashboard activity logs and Question Manager attempt records.
 
-### 3. Study Material & PDF Library
-- **Local PDF Import:** Select PDF files directly from your computer to store them in your browser's private IndexedDB.
-- **Interactive PDF Viewer:** Built with `pdfjs-dist` featuring canvas rendering, previous/next page navigation, direct page jump (`Page X of Y`), zoom in/out, and zoom reset.
-- **Metadata Display:** Track document title, file size, page count, and linked ACCA paper.
-- **Privacy First:** No documents are ever uploaded to cloud servers.
+---
 
-### 4. Question Manager
-- **Comprehensive Question Logging:** Record question number, title, ACCA paper, question type (Section A MCQ, Section B Case, Section C Constructed), topic tags, and personal study notes.
-- **Link Directly to PDF Pages:** Link questions to an imported PDF and page number. Clicking **Open PDF (p. X)** instantly jumps to that exact page in the PDF viewer.
-- **Doubt Flagging:** Flag difficult questions with one click for easy pre-exam revision.
-- **Confidence Rating:** Rate your understanding from 1 to 5 stars.
-- **Flexible Grouping & Filtering:** Filter by paper, status, or doubts, and group by topic tags, paper, or status.
-- **Exam Attempt Tracker:** Log marks scored, total available marks, and timing notes per question.
+## 📋 Supported vs. Unsupported Question Formats
 
-### 5. Persistence, Backup & Restore
-- **IndexedDB via Dexie.js:** Fast, relational local storage that handles large binary blobs (PDFs) and survives application restarts.
-- **Export Backup:** Download a structured JSON snapshot (`catchy-acca-backup-YYYY-MM-DD.json`) of all papers, questions, notes, and targets.
-- **Restore Backup:** Upload backup files with schema validation, conflict preview, and a choice between **Safe Merge** or **Complete Replace**.
+| Format | Support Status | Evaluation Method | Notes |
+| :--- | :---: | :--- | :--- |
+| **Section A Objective MCQ (Single-Select)** | **Full** | Automated (Answer Key) | Exact match with verified answer key (A, B, C, D). |
+| **Section A/B Multi-Select Objective** | **Full** | Automated (Partial Credit) | Evaluates all correct selections; proportional credit if partially correct with zero wrong choices. |
+| **Section C Constructed Response (Essay)** | **Full** | Self-Evaluation (Marking Guide) | Candidate response workspace with word count; evaluated against official marking guide points after submission. Does not simulate arbitrary grading. |
+| **Financial Calculation / Numerical** | **Full** | Self-Evaluation / Solution Workings | Working area with step-by-step model solution review. |
+| **Scanned Image-Only PDFs (without OCR text)** | *Requires Manual Entry* | N/A | System detects missing text layers and alerts user instead of corrupting data. |
+| **Interactive Drag-and-Drop CBE Hotspots** | *Future / Manual Entry* | N/A | Proprietary ACCA CBE proprietary interactive widgets. |
 
 ---
 
@@ -87,7 +92,7 @@ http://localhost:5173
 
 ## 🧪 Running Automated Tests
 
-To run the Vitest automated test suite:
+To run the Vitest test suite (32 automated unit and integration tests):
 ```bash
 npm test
 ```
@@ -107,23 +112,32 @@ catchy-acca/
 │   ├── components/
 │   │   ├── common/           # CircularProgress, Badge, Modal, EmptyState, ComingSoon
 │   │   ├── dashboard/        # Main Dashboard, metrics, study plan, next exam countdown
+│   │   ├── exam/             # Exam Environment, Setup, Live Session, Results, History
+│   │   ├── extraction/       # Extraction Review Screen & verification
 │   │   ├── help/             # User guide & ACCA student documentation
 │   │   ├── layout/           # AppLayout, navigation sidebar, global search bar
 │   │   ├── qualification/    # My ACCA qualification tracking & syllabus version switcher
 │   │   ├── questions/        # Question manager, doubt flags, topic grouping, attempts
 │   │   ├── settings/         # Local persistence explanation, JSON backup & restore
-│   │   └── study-materials/  # PDF library & canvas-based PDF viewer
+│   │   └── study-materials/  # PDF library, viewer & question extraction trigger
 │   ├── config/
-│   │   └── accaStructure.ts  # Official ACCA syllabus structure & progress math
+│   │   ├── accaStructure.ts  # Official ACCA syllabus structure & progress math
+│   │   └── syllabusTopics.ts # Syllabus topic taxonomies & keyword matching
 │   ├── db/
-│   │   └── index.ts          # Dexie.js IndexedDB database & backup validation
+│   │   └── index.ts          # Dexie.js IndexedDB database (v2 with examAttempts)
 │   ├── test/
-│   │   ├── accaStructure.test.ts  # Qualification rules & percentage math tests
+│   │   ├── accaStructure.test.ts    # Qualification rules & percentage math tests
 │   │   ├── backupValidation.test.ts # JSON backup validation tests
-│   │   ├── components.test.tsx    # CircularProgress & Badge UI tests
-│   │   └── integration.test.tsx   # End-to-end IndexedDB workflow tests
+│   │   ├── components.test.tsx      # CircularProgress & Badge UI tests
+│   │   ├── examScoring.test.ts      # Marking rules, partial credit & question ordering
+│   │   ├── integration.test.tsx     # Phase 1 IndexedDB workflow tests
+│   │   ├── pdfExtractor.test.ts     # Extraction parsing & topic intelligence tests
+│   │   └── phase2Integration.test.tsx # Exam simulation & attempt history tests
 │   ├── types/
-│   │   └── index.ts          # Core TypeScript type definitions
+│   │   └── index.ts          # Core TypeScript type definitions (Phase 1 & 2)
+│   ├── utils/
+│   │   ├── examScoring.ts    # Answer key evaluation & partial credit algorithms
+│   │   └── pdfExtractor.ts   # PDF text extraction & pattern parser
 │   ├── App.tsx               # Root component & reactive queries
 │   ├── main.tsx              # React DOM mounting
 │   └── index.css             # Tailwind CSS & global styles

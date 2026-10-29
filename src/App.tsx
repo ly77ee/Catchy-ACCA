@@ -16,6 +16,7 @@ import { Dashboard } from './components/dashboard/Dashboard';
 import { MyAcca } from './components/qualification/MyAcca';
 import { StudyMaterials } from './components/study-materials/StudyMaterials';
 import { Questions } from './components/questions/Questions';
+import { ExamEnvironment } from './components/exam/ExamEnvironment';
 import { Settings } from './components/settings/Settings';
 import { Help } from './components/help/Help';
 import { ComingSoon } from './components/common/ComingSoon';
@@ -50,6 +51,11 @@ export const App: React.FC = () => {
     []
   );
   const targets = useLiveQuery(() => db.targets.toArray(), [], []);
+  const examAttempts = useLiveQuery(
+    () => db.examAttempts.orderBy('startedAt').reverse().toArray(),
+    [],
+    []
+  );
 
   // Convert paper records array to dictionary keyed by paperId for fast lookups
   const paperRecordsMap: Record<string, StudentPaperRecord> = {};
@@ -138,19 +144,17 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Future Phase: Exam Environment */}
+      {/* Tab: Exam Environment */}
       {activeTab === 'exam-environment' && (
-        <ComingSoon
-          title="Exam Simulator Environment"
-          phase="Phase 2"
-          description="A faithful reproduction of the official ACCA Computer Based Exam (CBE) workspace, designed to prepare students for real exam timing and split-screen exhibit navigation."
-          plannedFeatures={[
-            'Split-screen exhibits, scenario documents, and candidate response panels.',
-            'Official 3-hour 15-minute exam timer with pause, warning banners, and time alerts.',
-            'Digital scratchpad, highlight tools, and calculator integration.',
-            'Flagging items for review and question item navigation bar.'
-          ]}
-          icon={FileCheck}
+        <ExamEnvironment
+          version={activeVersion}
+          allQuestions={questions || []}
+          materials={studyMaterials || []}
+          examAttempts={examAttempts || []}
+          defaultPaperId={currentTarget?.nextExamPaperId || 'FR'}
+          onOpenQuestionInManager={() => {
+            setActiveTab('questions');
+          }}
         />
       )}
 
