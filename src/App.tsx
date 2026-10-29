@@ -19,6 +19,9 @@ import { StudyMaterials } from './components/study-materials/StudyMaterials';
 import { Questions } from './components/questions/Questions';
 import { ExamEnvironment } from './components/exam/ExamEnvironment';
 import { ConnectedWorkspace } from './components/workspace/ConnectedWorkspace';
+import { WorkspaceSplitLayout } from './components/workspace/WorkspaceSplitLayout';
+import { SpreadsheetWorkspace } from './components/spreadsheet/SpreadsheetWorkspace';
+import { AnswerWriter } from './components/writer/AnswerWriter';
 import { Settings } from './components/settings/Settings';
 import { Help } from './components/help/Help';
 import { ComingSoon } from './components/common/ComingSoon';
@@ -40,6 +43,10 @@ export const App: React.FC = () => {
   const [activePdfMaterialId, setActivePdfMaterialId] = useState<string | null>(null);
   const [activePdfPage, setActivePdfPage] = useState<number>(1);
   const [activeWorkspaceQuestionId, setActiveWorkspaceQuestionId] = useState<string | undefined>(undefined);
+
+  // Independent shared document selection state for Excel and Word workspaces
+  const [excelSelectedMaterialId, setExcelSelectedMaterialId] = useState<string | null>(null);
+  const [wordSelectedMaterialId, setWordSelectedMaterialId] = useState<string | null>(null);
 
   // Initialize DB on boot
   useEffect(() => {
@@ -121,8 +128,8 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Tab: My ACCA */}
-      {activeTab === 'my-acca' && (
+      {/* Tab: My ACCA / Profile */}
+      {(activeTab === 'my-acca' || activeTab === 'profile') && (
         <MyAcca
           currentVersionId={versionId}
           onVersionChange={setVersionId}
@@ -149,6 +156,14 @@ export const App: React.FC = () => {
             setActivePdfMaterialId(null);
             setActivePdfPage(1);
           }}
+          onOpenInExcel={(matId) => {
+            setExcelSelectedMaterialId(matId);
+            setActiveTab('excel');
+          }}
+          onOpenInWord={(matId) => {
+            setWordSelectedMaterialId(matId);
+            setActiveTab('word');
+          }}
         />
       )}
 
@@ -161,11 +176,11 @@ export const App: React.FC = () => {
           onOpenPdfAtPage={handleOpenPdfAtPage}
           onOpenInWriter={(qId) => {
             setActiveWorkspaceQuestionId(qId);
-            setActiveTab('answer-writer');
+            setActiveTab('word');
           }}
           onOpenInSpreadsheet={(qId) => {
             setActiveWorkspaceQuestionId(qId);
-            setActiveTab('excel-workspace');
+            setActiveTab('excel');
           }}
         />
       )}
@@ -184,26 +199,48 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Tab: Excel Workspace */}
+      {/* Tab: Excel Full-Screen Split Workspace */}
       {(activeTab === 'excel' || activeTab === 'excel-workspace') && (
-        <ConnectedWorkspace
+        <WorkspaceSplitLayout
+          workspaceType="excel"
+          studyMaterials={studyMaterials || []}
+          selectedMaterialId={excelSelectedMaterialId}
+          onSelectMaterial={setExcelSelectedMaterialId}
+          onNavigateToStudyMaterials={() => setActiveTab('study-materials')}
+          onSwitchWorkspace={(type) => setActiveTab(type)}
           version={activeVersion}
-          allQuestions={questions || []}
-          initialQuestionId={activeWorkspaceQuestionId}
-          initialPaperId={currentTarget?.nextExamPaperId || 'FR'}
-          defaultMode="spreadsheet"
-        />
+        >
+          <SpreadsheetWorkspace
+            version={activeVersion}
+            allQuestions={questions || []}
+            initialQuestionId={activeWorkspaceQuestionId}
+            initialPaperId={currentTarget?.nextExamPaperId || 'FR'}
+            onSelectQuestion={setActiveWorkspaceQuestionId}
+            onOpenWriter={() => setActiveTab('word')}
+          />
+        </WorkspaceSplitLayout>
       )}
 
-      {/* Tab: Word Answer Writer */}
+      {/* Tab: Word Full-Screen Split Workspace */}
       {(activeTab === 'word' || activeTab === 'answer-writer') && (
-        <ConnectedWorkspace
+        <WorkspaceSplitLayout
+          workspaceType="word"
+          studyMaterials={studyMaterials || []}
+          selectedMaterialId={wordSelectedMaterialId}
+          onSelectMaterial={setWordSelectedMaterialId}
+          onNavigateToStudyMaterials={() => setActiveTab('study-materials')}
+          onSwitchWorkspace={(type) => setActiveTab(type)}
           version={activeVersion}
-          allQuestions={questions || []}
-          initialQuestionId={activeWorkspaceQuestionId}
-          initialPaperId={currentTarget?.nextExamPaperId || 'FR'}
-          defaultMode="writer"
-        />
+        >
+          <AnswerWriter
+            version={activeVersion}
+            allQuestions={questions || []}
+            initialQuestionId={activeWorkspaceQuestionId}
+            initialPaperId={currentTarget?.nextExamPaperId || 'FR'}
+            onSelectQuestion={setActiveWorkspaceQuestionId}
+            onOpenSpreadsheet={() => setActiveTab('excel')}
+          />
+        </WorkspaceSplitLayout>
       )}
 
       {/* Tab: Revision & Progress Analytics */}

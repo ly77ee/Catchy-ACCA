@@ -94,6 +94,8 @@ export interface StudyMaterial {
   fileSize: number;
   totalPages: number;
   paperId?: string;
+  qualificationVersionId?: string;
+  materialType?: string;
   tags: string[];
   addedAt: string;
   pdfData?: Blob | ArrayBuffer; // Stored in IndexedDB
