@@ -54,10 +54,16 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
 
   // Modal State for Import / Paste
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [customTitle, setCustomTitle] = useState<string>('');
   const [pasteMarkdown, setPasteMarkdown] = useState<string>('');
-  const [selectedPaperForImport, setSelectedPaperForImport] = useState<string>('SBR');
+  const [selectedPaperForImport, setSelectedPaperForImport] = useState<string>('');
   const [importMergeMode, setImportMergeMode] = useState<'create_new' | 'replace' | 'merge'>('create_new');
   const [copiedStatus, setCopiedStatus] = useState<boolean>(false);
+
+  // Modal State for Renaming / Editing Details
+  const [isEditDetailsModalOpen, setIsEditDetailsModalOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState<string>('');
+  const [editPaperId, setEditPaperId] = useState<string>('');
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -141,11 +147,11 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
   const handleExecuteImport = async () => {
     if (!pasteMarkdown.trim()) return;
 
-    const parsed = parseMarkdownChecklist(pasteMarkdown, selectedPaperForImport);
+    const parsed = parseMarkdownChecklist(pasteMarkdown, selectedPaperForImport || undefined);
     const now = new Date().toISOString();
 
-    const targetPaper = parsed.paperCode || selectedPaperForImport;
-    const title = parsed.detectedTitle || `${targetPaper} Checklist`;
+    const targetPaper = selectedPaperForImport ? selectedPaperForImport : (parsed.paperCode || undefined);
+    const resolvedTitle = customTitle.trim() || parsed.detectedTitle || (targetPaper ? `${targetPaper} Checklist` : 'Untitled Checklist');
 
     let targetChecklistId = activeChecklistId;
 
@@ -153,7 +159,7 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
       targetChecklistId = 'cl-' + Date.now();
       await db.checklists.put({
         id: targetChecklistId,
-        title,
+        title: resolvedTitle,
         paperId: targetPaper,
         qualificationVersionId: version.versionId,
         rawMarkdown: pasteMarkdown,
@@ -165,7 +171,7 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
     } else if (importMergeMode === 'replace') {
       await db.checklistItems.where('checklistId').equals(targetChecklistId).delete();
       await db.checklists.update(targetChecklistId, {
-        title,
+        title: resolvedTitle,
         paperId: targetPaper,
         rawMarkdown: pasteMarkdown,
         totalTasks: parsed.totalTasks,
@@ -184,11 +190,35 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
     }));
 
     await db.checklistItems.bulkPut(newItems);
-    await logActivity('Checklist Imported', `Imported ${parsed.totalTasks} study tasks for ${targetPaper}.`, 'plan');
+    await logActivity('Checklist Imported', `Imported ${parsed.totalTasks} study tasks${targetPaper ? ` for ${targetPaper}` : ''}.`, 'plan');
 
     setSelectedChecklistId(targetChecklistId);
     setIsImportModalOpen(false);
     setPasteMarkdown('');
+    setCustomTitle('');
+  };
+
+  // Open Edit Details Modal
+  const openEditDetailsModal = () => {
+    if (!activeChecklist) return;
+    setEditTitle(activeChecklist.title || '');
+    setEditPaperId(activeChecklist.paperId || '');
+    setIsEditDetailsModalOpen(true);
+  };
+
+  // Save Edited Details
+  const handleSaveDetails = async () => {
+    if (!activeChecklist) return;
+    const trimmed = editTitle.trim() || 'Untitled Checklist';
+    const paperVal = editPaperId ? editPaperId : undefined;
+
+    await db.checklists.update(activeChecklist.id, {
+      title: trimmed,
+      paperId: paperVal,
+      updatedAt: new Date().toISOString()
+    });
+
+    setIsEditDetailsModalOpen(false);
   };
 
   // Export to Markdown
@@ -288,11 +318,17 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
                     >
                       <div className="truncate mr-2">
                         <div className="flex items-center space-x-2">
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#25252e] text-acca-red border border-[#2a2a34]">
-                            {cl.paperId}
-                          </span>
+                          {cl.paperId ? (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#25252e] text-acca-red border border-[#2a2a34]">
+                              {cl.paperId}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#25252e] text-gray-400 border border-[#2a2a34]">
+                              General
+                            </span>
+                          )}
                           <span className="text-xs font-bold truncate text-white">
-                            {cl.title}
+                            {cl.title || 'Untitled Checklist'}
                           </span>
                         </div>
                         <div className="text-[10px] text-gray-500 mt-1">
@@ -327,12 +363,25 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#2a2a34]">
                 <div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-acca-red text-white">
-                      {activeChecklist.paperId}
-                    </span>
+                    {activeChecklist.paperId ? (
+                      <span className="text-xs font-bold px-2 py-0.5 rounded bg-acca-red text-white">
+                        {activeChecklist.paperId}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded bg-[#25252e] text-gray-300 border border-[#2a2a34]">
+                        General
+                      </span>
+                    )}
                     <h2 className="text-lg font-bold text-white">
-                      {activeChecklist.title}
+                      {activeChecklist.title || 'Untitled Checklist'}
                     </h2>
+                    <button
+                      onClick={openEditDetailsModal}
+                      className="p-1 text-gray-400 hover:text-white rounded hover:bg-[#25252e] transition-colors"
+                      title="Rename or change paper association"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     {completedTasksCount} of {totalTasksCount} tasks completed • {totalTasksCount - completedTasksCount} remaining
@@ -583,16 +632,30 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
             </div>
 
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div>
+                <label className="text-xs font-bold text-gray-300 block mb-1">
+                  Checklist Title (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={customTitle}
+                  onChange={e => setCustomTitle(e.target.value)}
+                  placeholder="e.g. IAS 16 & 36 Question Drill, Mock Revision, Topic 4 Practice"
+                  className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-acca-red"
+                />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-bold text-gray-300 block mb-1">
-                    Associate with ACCA Paper
+                    Associate with ACCA Paper (Optional)
                   </label>
                   <select
                     value={selectedPaperForImport}
                     onChange={e => setSelectedPaperForImport(e.target.value)}
                     className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-acca-red"
                   >
+                    <option value="">No paper (General)</option>
                     {version.papers.map(p => (
                       <option key={p.id} value={p.id}>
                         {p.id} — {p.name}
@@ -682,6 +745,83 @@ export const StudyChecklist: React.FC<StudyChecklistProps> = ({
                   Create Checklist
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Edit Details / Rename Modal */}
+      {isEditDetailsModalOpen && activeChecklist && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
+          <div className="bg-[#1e1e24] border border-[#2a2a34] rounded-2xl max-w-md w-full flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-[#2a2a34] flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-acca-red" />
+                  Edit Checklist Details
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Update the checklist title or change its ACCA paper association.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsEditDetailsModalOpen(false)}
+                className="text-gray-400 hover:text-white p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-300 block mb-1">
+                  Checklist Title
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  placeholder="e.g. Weekend Practice, Group Accounts"
+                  className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-acca-red"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-300 block mb-1">
+                  ACCA Paper Association
+                </label>
+                <select
+                  value={editPaperId}
+                  onChange={e => setEditPaperId(e.target.value)}
+                  className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-acca-red"
+                >
+                  <option value="">No paper (General / No Association)</option>
+                  {version.papers.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.id} — {p.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Select "No paper" to dissociate this checklist from specific exam papers.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-[#141419] border-t border-[#2a2a34] flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setIsEditDetailsModalOpen(false)}
+                className="px-4 py-2 bg-[#1e1e24] hover:bg-[#25252e] text-gray-300 rounded-xl text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveDetails}
+                className="px-4 py-2 bg-acca-red hover:bg-acca-red-hover text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+              >
+                Save Changes
+              </button>
             </div>
           </div>
         </div>

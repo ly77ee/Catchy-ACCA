@@ -32,7 +32,7 @@ export function sanitizeMarkdown(text: string): string {
  */
 export function parseMarkdownChecklist(
   rawMarkdown: string,
-  defaultPaperId: string = 'FR'
+  defaultPaperId?: string
 ): ParsedChecklistResult {
   const cleanMarkdown = sanitizeMarkdown(rawMarkdown);
   const lines = cleanMarkdown.split(/\r?\n/);
@@ -40,7 +40,8 @@ export function parseMarkdownChecklist(
   const items: Array<Omit<ChecklistItem, 'id' | 'checklistId' | 'createdAt' | 'updatedAt'>> = [];
   const warnings: string[] = [];
 
-  let currentPaper = defaultPaperId;
+  const initialPaper = defaultPaperId && defaultPaperId !== 'none' ? defaultPaperId : '';
+  let currentPaper = initialPaper;
   let currentSyllabusArea = '';
   let currentTopic = '';
   let detectedTitle = '';
@@ -70,7 +71,7 @@ export function parseMarkdownChecklist(
       currentTopic = '';
 
       items.push({
-        paperId: currentPaper,
+        paperId: currentPaper || undefined,
         title: headingText,
         completed: false,
         order: orderIndex++,
@@ -160,7 +161,7 @@ export function parseMarkdownChecklist(
 
       totalTasks++;
       items.push({
-        paperId: currentPaper,
+        paperId: currentPaper || undefined,
         syllabusArea: currentSyllabusArea || undefined,
         topic: currentTopic || undefined,
         title: text,
@@ -176,7 +177,7 @@ export function parseMarkdownChecklist(
     // Plain text / line-based question item
     totalTasks++;
     items.push({
-      paperId: currentPaper,
+      paperId: currentPaper || undefined,
       syllabusArea: currentSyllabusArea || undefined,
       topic: currentTopic || undefined,
       title: trimmed,
@@ -193,8 +194,8 @@ export function parseMarkdownChecklist(
   }
 
   return {
-    paperCode: currentPaper,
-    detectedTitle: detectedTitle || `${currentPaper} Question Checklist`,
+    paperCode: currentPaper || undefined,
+    detectedTitle: detectedTitle || (currentPaper ? `${currentPaper} Question Checklist` : 'Question Checklist'),
     items,
     totalTasks,
     completedTasks,

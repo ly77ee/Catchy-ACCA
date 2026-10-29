@@ -58,7 +58,8 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
   const [workbookRecord, setWorkbookRecord] = useState<SpreadsheetWorkbook | null>(null);
   const [sheetData, setSheetData] = useState<FortuneSheetType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'dirty'>('saved');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'dirty' | 'failed'>('saved');
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
 
@@ -68,9 +69,67 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const workbookRecordRef = useRef<SpreadsheetWorkbook | null>(null);
+  const latestDataRef = useRef<FortuneSheetType[]>([]);
+  const isSavingRef = useRef<boolean>(false);
+  const suppressDirtyUntilRef = useRef<number>(0);
+
+  // Sync ref with state
+  useEffect(() => {
+    workbookRecordRef.current = workbookRecord;
+  }, [workbookRecord]);
+
   // Available questions for selected paper
   const paperQuestions = allQuestions.filter(q => q.paperId === selectedPaperId);
   const selectedQuestion = allQuestions.find(q => q.id === selectedQuestionId);
+
+  // Core Workbook Save Function
+  const saveCurrentWorkbook = useCallback(async (trigger: 'auto' | 'manual' = 'manual') => {
+    if (isSavingRef.current) return;
+    const currentWb = workbookRecordRef.current;
+    if (!currentWb) return;
+
+    // If manual save, commit any active cell editing input
+    if (trigger === 'manual') {
+      const cellInput = hostContainerRef.current?.querySelector<HTMLDivElement>('.luckysheet-cell-input');
+      if (cellInput && document.activeElement === cellInput) {
+        cellInput.blur();
+      }
+    }
+
+    isSavingRef.current = true;
+    setSaveStatus('saving');
+    setSaveErrorMessage(null);
+
+    try {
+      // Gather latest sheets from FortuneSheet API if available, fallback to latestDataRef or sheetData
+      const apiSheets = workbookRef.current?.getAllSheets();
+      const rawSheets = (apiSheets && apiSheets.length > 0
+        ? apiSheets
+        : latestDataRef.current && latestDataRef.current.length > 0
+        ? latestDataRef.current
+        : sheetData) as FortuneSheetType[];
+
+      const updatedWb = fortuneSheetsToSpreadsheetWorkbook(rawSheets, currentWb);
+      await db.spreadsheets.put(updatedWb);
+
+      workbookRecordRef.current = updatedWb;
+      setWorkbookRecord(updatedWb);
+      setLastSavedTime(updatedWb.updatedAt);
+      suppressDirtyUntilRef.current = Date.now() + 500;
+      setSaveStatus('saved');
+
+      if (trigger === 'manual') {
+        await logActivity('Spreadsheet Saved', `Saved Excel spreadsheet for ${selectedPaperId}`, 'workspace');
+      }
+    } catch (err: any) {
+      console.error('Save failed:', err);
+      setSaveStatus('failed');
+      setSaveErrorMessage(err?.message || 'Failed to save to database');
+    } finally {
+      isSavingRef.current = false;
+    }
+  }, [selectedPaperId, sheetData]);
 
   // Load workbook from IndexedDB
   useEffect(() => {
@@ -94,8 +153,10 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
 
         if (list.length > 0) {
           const loadedWb = list[0];
+          workbookRecordRef.current = loadedWb;
           setWorkbookRecord(loadedWb);
           const converted = spreadsheetWorkbookToFortuneSheets(loadedWb);
+          latestDataRef.current = converted;
           setSheetData(converted);
           setLastSavedTime(loadedWb.updatedAt);
         } else {
@@ -120,10 +181,13 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
           await db.spreadsheets.put(completeWb);
 
           if (isCancelled) return;
+          workbookRecordRef.current = completeWb;
           setWorkbookRecord(completeWb);
+          latestDataRef.current = initialSheets;
           setSheetData(initialSheets);
           setLastSavedTime(completeWb.updatedAt);
         }
+        suppressDirtyUntilRef.current = Date.now() + 500;
         setSaveStatus('saved');
       } catch (err) {
         console.error('Error loading spreadsheet workbook:', err);
@@ -336,18 +400,48 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
       const cellLeft = col * defaultColWidth;
       const cellRight = cellLeft + defaultColWidth;
       const currentScroll = scrollbarX.scrollLeft;
-      const viewportWidth = viewportEl.clientWidth - rowHeaderWidth;
+      const viewportWidth = scrollbarX.clientWidth > 0 ? scrollbarX.clientWidth : (viewportEl.clientWidth - rowHeaderWidth);
 
       if (viewportWidth <= 0) return;
 
-      if (cellRight > currentScroll + viewportWidth - 10) {
-        const nextScroll = cellRight - viewportWidth + 60;
+      if (cellRight > currentScroll + viewportWidth - 20) {
+        const nextScroll = cellRight - viewportWidth + 80;
         scrollbarX.scrollLeft = nextScroll;
-        scrollbarX.dispatchEvent(new Event('scroll'));
+        scrollbarX.dispatchEvent(new Event('scroll', { bubbles: true }));
+        try {
+          workbookRef.current?.scroll({ scrollLeft: nextScroll });
+        } catch {
+          // ignore
+        }
       } else if (cellLeft < currentScroll + 10) {
         const nextScroll = Math.max(0, cellLeft - 40);
         scrollbarX.scrollLeft = nextScroll;
-        scrollbarX.dispatchEvent(new Event('scroll'));
+        scrollbarX.dispatchEvent(new Event('scroll', { bubbles: true }));
+        try {
+          workbookRef.current?.scroll({ scrollLeft: nextScroll });
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    const checkActiveCell = () => {
+      const nb = container.querySelector<HTMLDivElement>('.fortune-name-box');
+      const text = nb?.textContent?.trim() || nb?.innerText?.trim();
+      if (text) {
+        const parsed = parseCellAddress(text);
+        if (parsed) {
+          revealActiveCell(parsed.col);
+          return;
+        }
+      }
+      try {
+        const sel = workbookRef.current?.getSelection();
+        if (sel && sel.length > 0 && sel[0].column && sel[0].column.length > 0) {
+          revealActiveCell(sel[0].column[0]);
+        }
+      } catch {
+        // ignore
       }
     };
 
@@ -362,7 +456,12 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
         if (scrollbarX) {
           e.preventDefault();
           scrollbarX.scrollLeft += deltaX;
-          scrollbarX.dispatchEvent(new Event('scroll'));
+          scrollbarX.dispatchEvent(new Event('scroll', { bubbles: true }));
+          try {
+            workbookRef.current?.scroll({ scrollLeft: scrollbarX.scrollLeft });
+          } catch {
+            // ignore
+          }
         }
       }
     };
@@ -370,88 +469,85 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
 
     // Monitor active cell changes via FortuneSheet name-box mutation
     let observer: MutationObserver | null = null;
-    const nameBox = container.querySelector<HTMLDivElement>('.fortune-name-box');
-    if (nameBox) {
-      observer = new MutationObserver(() => {
-        const text = nameBox.textContent || nameBox.innerText;
-        if (text) {
-          const parsed = parseCellAddress(text);
-          if (parsed) {
-            revealActiveCell(parsed.col);
-          }
-        }
-      });
-      observer.observe(nameBox, { childList: true, characterData: true, subtree: true });
-    }
+    let nameBoxTimer: NodeJS.Timeout | null = null;
 
-    // Keyboard navigation auto-reveal (Arrow keys, Tab, Shift+Tab)
+    const attachObserver = () => {
+      const nameBox = container.querySelector<HTMLDivElement>('.fortune-name-box');
+      if (nameBox && !observer) {
+        observer = new MutationObserver(() => {
+          checkActiveCell();
+        });
+        observer.observe(nameBox, { childList: true, characterData: true, subtree: true });
+      }
+    };
+    attachObserver();
+    nameBoxTimer = setTimeout(attachObserver, 200);
+
+    // Keyboard navigation auto-reveal (Arrow keys, Tab, Shift+Tab, Enter)
     const handleKeyNavCheck = (e: KeyboardEvent) => {
-      if (['ArrowRight', 'ArrowLeft', 'Tab'].includes(e.key)) {
-        setTimeout(() => {
-          const nb = container.querySelector<HTMLDivElement>('.fortune-name-box');
-          if (nb && nb.textContent) {
-            const parsed = parseCellAddress(nb.textContent);
-            if (parsed) {
-              revealActiveCell(parsed.col);
-            }
-          }
-        }, 15);
+      if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter'].includes(e.key)) {
+        setTimeout(checkActiveCell, 20);
       }
     };
     container.addEventListener('keyup', handleKeyNavCheck);
+
+    const handleMouseUp = () => {
+      setTimeout(checkActiveCell, 30);
+    };
+    container.addEventListener('mouseup', handleMouseUp);
+    container.addEventListener('touchend', handleMouseUp);
+
+    // ResizeObserver to adapt to split-screen resizing
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        window.dispatchEvent(new Event('resize'));
+        setTimeout(checkActiveCell, 30);
+      });
+      resizeObserver.observe(container);
+    }
 
     container.addEventListener('keydown', handleKeyDownCapture, { capture: true });
     return () => {
       container.removeEventListener('keydown', handleKeyDownCapture, { capture: true });
       container.removeEventListener('wheel', handleWheel);
       container.removeEventListener('keyup', handleKeyNavCheck);
+      container.removeEventListener('mouseup', handleMouseUp);
+      container.removeEventListener('touchend', handleMouseUp);
+      if (nameBoxTimer) clearTimeout(nameBoxTimer);
       if (observer) observer.disconnect();
+      if (resizeObserver) resizeObserver.disconnect();
       clearVisualRangeBox();
     };
   }, [isLoading]);
 
   // Handle Sheet Data Change from FortuneSheet
   const handleSheetChange = useCallback((newData: any[]) => {
-    setSheetData(newData);
+    latestDataRef.current = newData;
+
+    if (Date.now() < suppressDirtyUntilRef.current) {
+      return;
+    }
+
     setSaveStatus('dirty');
 
-    // Debounce auto-save (800ms)
+    // Debounce auto-save (1000ms)
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
     }
 
-    autoSaveTimerRef.current = setTimeout(async () => {
-      if (!workbookRecord) return;
-      try {
-        setSaveStatus('saving');
-        const updatedWb = fortuneSheetsToSpreadsheetWorkbook(newData, workbookRecord);
-        await db.spreadsheets.put(updatedWb);
-        setWorkbookRecord(updatedWb);
-        setSaveStatus('saved');
-        setLastSavedTime(updatedWb.updatedAt);
-      } catch (err) {
-        console.error('Auto-save spreadsheet failed:', err);
-        setSaveStatus('dirty');
-      }
-    }, 800);
-  }, [workbookRecord]);
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveCurrentWorkbook('auto');
+    }, 1000);
+  }, [saveCurrentWorkbook]);
 
   // Explicit Save
-  const handleManualSave = async () => {
-    if (!workbookRecord) return;
-    try {
-      setSaveStatus('saving');
-      const latestData = (workbookRef.current?.getAllSheets() || sheetData) as any;
-      const updatedWb = fortuneSheetsToSpreadsheetWorkbook(latestData, workbookRecord);
-      await db.spreadsheets.put(updatedWb);
-      setWorkbookRecord(updatedWb);
-      setSaveStatus('saved');
-      setLastSavedTime(updatedWb.updatedAt);
-      await logActivity('Spreadsheet Saved', `Saved Excel spreadsheet for ${selectedPaperId}`, 'workspace');
-    } catch (err) {
-      console.error('Save failed:', err);
-      setSaveStatus('dirty');
+  const handleManualSave = () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
     }
+    saveCurrentWorkbook('manual');
   };
 
   // Reset to default ACCA CBE financial template
@@ -650,21 +746,39 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
           {/* Right: Actions, Save Indicator, CSV */}
           <div className="flex items-center space-x-1.5 shrink-0">
             {/* Save Status Indicator */}
-            <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded-lg bg-[#141419] border border-[#2a2a34] text-[11px] font-medium text-gray-400">
+            <div
+              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-all ${
+                saveStatus === 'saving'
+                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                  : saveStatus === 'dirty'
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                  : saveStatus === 'failed'
+                  ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                  : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              }`}
+              title={saveStatus === 'failed' && saveErrorMessage ? saveErrorMessage : undefined}
+            >
               {saveStatus === 'saving' ? (
                 <>
-                  <Clock className="w-3 h-3 text-amber-400 animate-spin" />
-                  <span className="text-amber-400 text-[10px]">Saving...</span>
+                  <Clock className="w-3.5 h-3.5 text-blue-400 animate-spin" />
+                  <span className="font-semibold">Saving...</span>
                 </>
               ) : saveStatus === 'dirty' ? (
                 <>
-                  <AlertCircle className="w-3 h-3 text-amber-400" />
-                  <span className="text-amber-300 text-[10px]">Unsaved</span>
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="font-semibold">Unsaved</span>
+                </>
+              ) : saveStatus === 'failed' ? (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                  <span className="font-semibold">Save failed</span>
                 </>
               ) : (
                 <>
-                  <Check className="w-3 h-3 text-emerald-400" />
-                  <span className="text-emerald-400 text-[10px]">Saved</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="font-semibold">
+                    Saved{lastSavedTime ? ` (${new Date(lastSavedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ''}
+                  </span>
                 </>
               )}
             </div>
@@ -673,11 +787,12 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
             <button
               type="button"
               onClick={handleManualSave}
-              className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1 transition-colors shadow-xs"
+              disabled={saveStatus === 'saving'}
+              className="px-3 py-1 bg-acca-red hover:bg-acca-red-hover disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all shadow-xs"
               title="Save workbook to local IndexedDB"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>Save</span>
+              <span>{saveStatus === 'saving' ? 'Saving...' : 'Save'}</span>
             </button>
 
             {/* Reset Template */}

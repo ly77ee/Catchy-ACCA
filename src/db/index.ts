@@ -15,7 +15,9 @@ import {
   AccaNewsItem,
   DocumentAnnotation,
   NoteFolder,
-  CatchyNote
+  CatchyNote,
+  ChapterMasteryRecord,
+  ChapterMasteryStatus
 } from '../types';
 
 export class CatchyAccaDatabase extends Dexie {
@@ -34,6 +36,7 @@ export class CatchyAccaDatabase extends Dexie {
   annotations!: Table<DocumentAnnotation, string>;
   notes!: Table<CatchyNote, string>;
   noteFolders!: Table<NoteFolder, string>;
+  chapterMastery!: Table<ChapterMasteryRecord, string>;
 
   constructor() {
     super('CatchyAccaDB');
@@ -79,6 +82,11 @@ export class CatchyAccaDatabase extends Dexie {
     this.version(7).stores({
       notes: 'id, folderId, isPinned, isDeleted, updatedAt, createdAt',
       noteFolders: 'id, parentId, updatedAt, createdAt'
+    });
+
+    // Version 8 adds Syllabus Chapter Mastery Tracker
+    this.version(8).stores({
+      chapterMastery: 'id, paperId, chapterNumber, status, updatedAt'
     });
   }
 }
@@ -389,6 +397,7 @@ export async function createBackupPayload(versionId: string): Promise<BackupPayl
   const annotations = await db.annotations.toArray();
   const notes = await db.notes.toArray();
   const noteFolders = await db.noteFolders.toArray();
+  const chapterMastery = await db.chapterMastery.toArray();
 
   // Strip large binary blobs from JSON backup for safety & portability
   const sanitizedMaterials = studyMaterials.map(({ pdfData, ...rest }) => rest);
@@ -412,7 +421,8 @@ export async function createBackupPayload(versionId: string): Promise<BackupPayl
     newsCache,
     annotations,
     notes,
-    noteFolders
+    noteFolders,
+    chapterMastery
   };
 }
 
@@ -484,7 +494,8 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       db.newsCache,
       db.annotations,
       db.notes,
-      db.noteFolders
+      db.noteFolders,
+      db.chapterMastery
     ], async () => {
       await db.paperRecords.clear();
       await db.questions.clear();
@@ -500,6 +511,7 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       await db.annotations.clear();
       await db.notes.clear();
       await db.noteFolders.clear();
+      await db.chapterMastery.clear();
 
       if (payload.paperRecords?.length) await db.paperRecords.bulkPut(payload.paperRecords);
       if (payload.questions?.length) await db.questions.bulkPut(payload.questions);
@@ -515,6 +527,7 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
       if (payload.annotations?.length) await db.annotations.bulkPut(payload.annotations);
       if (payload.notes?.length) await db.notes.bulkPut(payload.notes);
       if (payload.noteFolders?.length) await db.noteFolders.bulkPut(payload.noteFolders);
+      if (payload.chapterMastery?.length) await db.chapterMastery.bulkPut(payload.chapterMastery);
     });
   } else {
     // Merge mode: upsert records
@@ -531,6 +544,7 @@ export async function restoreBackup(payload: BackupPayload, mode: 'merge' | 'ove
     if (payload.annotations?.length) await db.annotations.bulkPut(payload.annotations);
     if (payload.notes?.length) await db.notes.bulkPut(payload.notes);
     if (payload.noteFolders?.length) await db.noteFolders.bulkPut(payload.noteFolders);
+    if (payload.chapterMastery?.length) await db.chapterMastery.bulkPut(payload.chapterMastery);
   }
 
   await logActivity(
@@ -771,4 +785,40 @@ export async function deleteTarget(id: string): Promise<void> {
     console.error('Failed to delete exam target:', err);
     throw err;
   }
+}
+
+// ============================================================================
+// Syllabus Chapter Mastery Helpers
+// ============================================================================
+
+export async function getChapterMastery(paperId?: string): Promise<ChapterMasteryRecord[]> {
+  if (paperId) {
+    return db.chapterMastery.where('paperId').equals(paperId.toUpperCase()).toArray();
+  }
+  return db.chapterMastery.toArray();
+}
+
+export async function setChapterStatus(
+  paperId: string,
+  chapterNumber: number,
+  chapterTitle: string,
+  status: ChapterMasteryStatus,
+  notes?: string
+): Promise<void> {
+  const upperPaper = paperId.toUpperCase();
+  const id = `${upperPaper}-ch-${chapterNumber}`;
+  const now = new Date().toISOString();
+  await db.chapterMastery.put({
+    id,
+    paperId: upperPaper,
+    chapterNumber,
+    chapterTitle,
+    status,
+    notes,
+    updatedAt: now
+  });
+}
+
+export async function resetChapterStatus(id: string): Promise<void> {
+  await db.chapterMastery.delete(id);
 }

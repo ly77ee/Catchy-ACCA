@@ -127,7 +127,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       title: 'Resources',
       items: [
         { id: 'acca-news', label: 'ACCA News', icon: Newspaper },
-        { id: 'ai-assistant', label: 'AI Assistant', icon: Bot },
       ],
     },
     {

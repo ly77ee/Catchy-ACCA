@@ -345,7 +345,7 @@ export interface RevisionTopicStat {
 export interface ChecklistItem {
   id: string;
   checklistId: string;
-  paperId: string;
+  paperId?: string;
   syllabusArea?: string;
   topic?: string;
   title: string;
@@ -377,10 +377,56 @@ export interface DocumentAnnotation {
   createdAt: string;
 }
 
+export type ChapterMasteryStatus =
+  | 'not_assessed'
+  | 'not_studied'
+  | 'needs_substantial_work'
+  | 'doubtful'
+  | 'needs_revision'
+  | 'good'
+  | 'well_understood'
+  | 'excellent';
+
+export interface ChapterMasteryRecord {
+  id: string; // `${paperId}-ch-${chapterNumber}`
+  paperId: string;
+  chapterNumber: number;
+  chapterTitle: string;
+  status: ChapterMasteryStatus;
+  notes?: string;
+  updatedAt: string;
+}
+
+export interface SyllabusChapter {
+  chapterNumber: number;
+  title: string;
+}
+
+export interface SyllabusPaper {
+  id: string;
+  code: string;
+  name: string;
+  stageName?: string;
+  chapters: SyllabusChapter[];
+}
+
+export interface StatusConfigItem {
+  id: ChapterMasteryStatus;
+  label: string;
+  shortLabel: string;
+  color: string;
+  badgeBg: string;
+  badgeText: string;
+  badgeBorder: string;
+  isPositiveMastery: boolean;
+  isPriorityRevision: boolean;
+  order: number;
+}
+
 export interface ChecklistRecord {
   id: string;
   title: string;
-  paperId: string;
+  paperId?: string;
   qualificationVersionId?: string;
   rawMarkdown: string;
   totalTasks: number;
@@ -445,6 +491,7 @@ export interface BackupPayload {
   annotations?: DocumentAnnotation[];
   notes?: CatchyNote[];
   noteFolders?: NoteFolder[];
+  chapterMastery?: ChapterMasteryRecord[];
   aiConfig?: AIProviderConfig;
   answerReviews?: AnswerReviewResult[];
 }

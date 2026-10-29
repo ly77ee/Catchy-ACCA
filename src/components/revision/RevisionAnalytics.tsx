@@ -1,35 +1,48 @@
 import React, { useState, useMemo } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import {
   QualificationVersion,
   QuestionRecord,
   StudentPaperRecord,
   ExamAttemptRecord,
-  RevisionTopicStat,
+  ChapterMasteryRecord,
+  ChapterMasteryStatus,
+  SyllabusPaper
 } from '../../types';
-import { ACCA_SYLLABUS_TOPICS } from '../../config/syllabusTopics';
-import { db, logActivity } from '../../db';
 import {
-  Brain,
-  AlertTriangle,
-  CheckCircle2,
-  TrendingUp,
-  Target,
-  Play,
-  FileEdit,
-  Sparkles,
+  ACCA_SYLLABUS_PAPERS,
+  TOTAL_SYLLABUS_PAPERS,
+  TOTAL_SYLLABUS_CHAPTERS,
+  DEFAULT_MASTERY_STATUS_CONFIGS,
+  getStatusConfig,
+  getPaperById
+} from '../../config/accaChapterSyllabus';
+import { db, setChapterStatus, resetChapterStatus } from '../../db';
+import {
   BookOpen,
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  ArrowLeft,
+  Search,
   Filter,
-  BarChart3,
-  Calendar,
-  Check,
+  Flame,
+  Award,
+  ChevronRight,
   RotateCcw,
+  Sparkles,
+  Info,
+  Clock,
+  Layers,
+  ChevronDown
 } from 'lucide-react';
+import { CircularProgress } from '../common/CircularProgress';
 
 interface RevisionAnalyticsProps {
   version: QualificationVersion;
-  allQuestions: QuestionRecord[];
-  paperRecords: StudentPaperRecord[];
-  examAttempts: ExamAttemptRecord[];
+  allQuestions?: QuestionRecord[];
+  paperRecords?: StudentPaperRecord[];
+  examAttempts?: ExamAttemptRecord[];
   onLaunchPracticeExam?: (paperId: string, questionIds: string[]) => void;
   onOpenQuestionInWriter?: (questionId: string) => void;
   onRefreshData?: () => void;
@@ -42,553 +55,797 @@ export const RevisionAnalytics: React.FC<RevisionAnalyticsProps> = ({
   examAttempts,
   onLaunchPracticeExam,
   onOpenQuestionInWriter,
-  onRefreshData,
+  onRefreshData
 }) => {
-  const [selectedPaperId, setSelectedPaperId] = useState<string>('FR');
-  const [activeTab, setActiveTab] = useState<'mistakes' | 'topics' | 'planner'>('mistakes');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'doubtful' | 'failed'>('all');
+  // Live query for all chapter mastery records from Dexie
+  const masteryRecords = useLiveQuery<ChapterMasteryRecord[], ChapterMasteryRecord[]>(
+    () => db.chapterMastery.toArray(),
+    [],
+    []
+  );
 
-  // Compute Weak-Topic Analysis for the selected paper
-  const topicStats: RevisionTopicStat[] = useMemo(() => {
-    const paperTopicDefs = ACCA_SYLLABUS_TOPICS.filter((t) => t.paperId === selectedPaperId);
-    const paperTopics: string[] = paperTopicDefs.length > 0
-      ? paperTopicDefs.map((t) => t.topicName)
-      : [
-          'Core Principles & Framework',
-          'Standards Application & Accounting Treatments',
-          'Calculations & Practical Workings',
-          'Reporting, Disclosures & Professional Case Study',
-        ];
+  // Active view: null = all papers overview; string = selected paperId
+  const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null);
 
-    const paperQuestions = allQuestions.filter((q) => q.paperId === selectedPaperId);
-    const paperAttempts = examAttempts.filter((a) => a.paperId === selectedPaperId);
+  // Search & Filter in Overview
+  const [paperSearchQuery, setPaperSearchQuery] = useState('');
+  const [selectedStageFilter, setSelectedStageFilter] = useState<'all' | 'Applied Knowledge' | 'Applied Skills' | 'Strategic Professional'>('all');
+  const [paperSortBy, setPaperSortBy] = useState<'code' | 'name' | 'lowest_mastery' | 'most_revision' | 'highest_coverage'>('code');
 
-    return paperTopics.map((topicName: string) => {
-      // Questions matching this topic
-      const matchingQuestions = paperQuestions.filter((q) =>
-        (q.topicTags || []).some((t: string) =>
-          t.toLowerCase().includes(topicName.toLowerCase()) || topicName.toLowerCase().includes(t.toLowerCase())
-        )
-      );
+  // Search & Filter in Chapter Detail
+  const [chapterSearchQuery, setChapterSearchQuery] = useState('');
+  const [chapterStatusFilter, setChapterStatusFilter] = useState<'all' | 'not_assessed' | 'priority' | 'positive'>('all');
 
-      const matchingQuestionIds = new Set(matchingQuestions.map((q) => q.id));
+  // Expand note editor for chapter id
+  const [expandedNoteChapterId, setExpandedNoteChapterId] = useState<string | null>(null);
+  const [noteDraftText, setNoteDraftText] = useState<string>('');
 
-      // Doubts count
-      const doubtsCount = matchingQuestions.filter((q) => q.isDoubt).length;
-
-      // Calculate score across completed attempts that included these questions
-      let totalMarksAwarded = 0;
-      let totalMarksAvailable = 0;
-      let attemptCount = 0;
-
-      paperAttempts.forEach((att) => {
-        let hasTopicQuestion = false;
-        att.questionIds.forEach((qId) => {
-          if (matchingQuestionIds.has(qId)) {
-            hasTopicQuestion = true;
-            const resp = att.responses[qId];
-            if (resp && resp.marksAwarded !== undefined) {
-              const qObj = paperQuestions.find((q) => q.id === qId);
-              const maxMarks = qObj?.availableMarks || 2;
-              totalMarksAwarded += resp.marksAwarded;
-              totalMarksAvailable += maxMarks;
-            }
-          }
-        });
-        if (hasTopicQuestion) attemptCount++;
-      });
-
-      let averageScorePercent = 0;
-      if (totalMarksAvailable > 0) {
-        averageScorePercent = Math.round((totalMarksAwarded / totalMarksAvailable) * 100);
-      } else if (matchingQuestions.length > 0 && doubtsCount === 0) {
-        averageScorePercent = 70; // baseline if no exams taken yet but questions exist
-      }
-
-      let status: 'mastered' | 'solid' | 'needs_revision' = 'solid';
-      if (doubtsCount > 0 || (attemptCount > 0 && averageScorePercent < 50)) {
-        status = 'needs_revision';
-      } else if (attemptCount > 0 && averageScorePercent >= 75 && doubtsCount === 0) {
-        status = 'mastered';
-      } else if (attemptCount === 0 && doubtsCount === 0) {
-        status = 'solid';
-      }
-
-      return {
-        topicName,
-        paperId: selectedPaperId,
-        totalAttempts: attemptCount,
-        averageScorePercent,
-        doubtsCount,
-        status,
-      };
+  // Map of chapter records by id
+  const masteryMap = useMemo(() => {
+    const map = new Map<string, ChapterMasteryRecord>();
+    (masteryRecords || []).forEach(rec => {
+      map.set(rec.id, rec);
     });
-  }, [selectedPaperId, allQuestions, examAttempts]);
+    return map;
+  }, [masteryRecords]);
 
-  // Compute Mistake & Doubt Journal
-  const mistakeJournalQuestions = useMemo(() => {
-    return allQuestions.filter((q) => {
-      if (q.paperId !== selectedPaperId) return false;
+  // Overall Global Statistics
+  const globalStats = useMemo(() => {
+    let assessedCount = 0;
+    let positiveMasteryCount = 0;
+    let priorityCount = 0;
+    const countsByStatus: Record<ChapterMasteryStatus, number> = {
+      not_assessed: 0,
+      not_studied: 0,
+      needs_substantial_work: 0,
+      doubtful: 0,
+      needs_revision: 0,
+      good: 0,
+      well_understood: 0,
+      excellent: 0
+    };
 
-      // Check if marked doubtful
-      const isDoubtful = Boolean(q.isDoubt);
+    const priorityChapters: Array<{
+      paper: SyllabusPaper;
+      chapterNumber: number;
+      chapterTitle: string;
+      status: ChapterMasteryStatus;
+      id: string;
+    }> = [];
 
-      // Check if scored < 50% in any past attempt
-      let failedInExam = false;
-      examAttempts.forEach((att) => {
-        if (att.paperId === q.paperId && att.questionIds.includes(q.id)) {
-          const resp = att.responses[q.id];
-          if (resp && resp.marksAwarded !== undefined) {
-            const maxMarks = q.availableMarks || 2;
-            if (resp.marksAwarded / maxMarks < 0.5) {
-              failedInExam = true;
-            }
-          }
+    ACCA_SYLLABUS_PAPERS.forEach(paper => {
+      paper.chapters.forEach(ch => {
+        const id = `${paper.id}-ch-${ch.chapterNumber}`;
+        const record = masteryMap.get(id);
+        const status = record?.status || 'not_assessed';
+        countsByStatus[status]++;
+
+        if (status !== 'not_assessed') {
+          assessedCount++;
+        }
+
+        const config = getStatusConfig(status);
+        if (config.isPositiveMastery) {
+          positiveMasteryCount++;
+        }
+        if (config.isPriorityRevision) {
+          priorityCount++;
+          priorityChapters.push({
+            paper,
+            chapterNumber: ch.chapterNumber,
+            chapterTitle: ch.title,
+            status,
+            id
+          });
         }
       });
-
-      if (statusFilter === 'doubtful') return isDoubtful;
-      if (statusFilter === 'failed') return failedInExam;
-      return isDoubtful || failedInExam;
     });
-  }, [selectedPaperId, allQuestions, examAttempts, statusFilter]);
 
-  // Toggle question doubt status
-  const handleToggleDoubt = async (q: QuestionRecord) => {
-    const updated: QuestionRecord = {
-      ...q,
-      isDoubt: !q.isDoubt,
+    const coveragePct = TOTAL_SYLLABUS_CHAPTERS > 0
+      ? Math.round((assessedCount / TOTAL_SYLLABUS_CHAPTERS) * 100)
+      : 0;
+
+    const masteryPct = TOTAL_SYLLABUS_CHAPTERS > 0
+      ? Math.round((positiveMasteryCount / TOTAL_SYLLABUS_CHAPTERS) * 100)
+      : 0;
+
+    return {
+      assessedCount,
+      positiveMasteryCount,
+      priorityCount,
+      coveragePct,
+      masteryPct,
+      countsByStatus,
+      priorityChapters
     };
-    await db.questions.put(updated);
-    await logActivity(
-      q.isDoubt ? 'Resolved Doubt' : 'Flagged Doubt',
-      `${q.questionNumber}: ${q.title}`,
-      'question'
-    );
-    if (onRefreshData) onRefreshData();
-  };
+  }, [masteryMap]);
 
-  // Launch revision practice exam for weak topics
-  const handleLaunchWeakTopicExam = () => {
-    const weakTopics = topicStats
-      .filter((t) => t.status === 'needs_revision')
-      .map((t) => t.topicName.toLowerCase());
+  // Paper-level stats computation helper
+  const getPaperStats = (paper: SyllabusPaper) => {
+    const totalChapters = paper.chapters.length;
+    let assessedCount = 0;
+    let positiveCount = 0;
+    let priorityCount = 0;
+    const counts: Record<ChapterMasteryStatus, number> = {
+      not_assessed: 0,
+      not_studied: 0,
+      needs_substantial_work: 0,
+      doubtful: 0,
+      needs_revision: 0,
+      good: 0,
+      well_understood: 0,
+      excellent: 0
+    };
 
-    const eligible = allQuestions.filter((q) => {
-      if (q.paperId !== selectedPaperId) return false;
-      if (q.isDoubt) return true;
-      return (q.topicTags || []).some((t: string) =>
-        weakTopics.some((wt) => wt.includes(t.toLowerCase()) || t.toLowerCase().includes(wt))
-      );
+    paper.chapters.forEach(ch => {
+      const id = `${paper.id}-ch-${ch.chapterNumber}`;
+      const rec = masteryMap.get(id);
+      const st = rec?.status || 'not_assessed';
+      counts[st]++;
+      if (st !== 'not_assessed') assessedCount++;
+      const cfg = getStatusConfig(st);
+      if (cfg.isPositiveMastery) positiveCount++;
+      if (cfg.isPriorityRevision) priorityCount++;
     });
 
-    const targetIds = (eligible.length > 0 ? eligible : allQuestions.filter((q) => q.paperId === selectedPaperId))
-      .slice(0, 10)
-      .map((q) => q.id);
+    const coveragePct = totalChapters > 0 ? Math.round((assessedCount / totalChapters) * 100) : 0;
+    const masteryPct = totalChapters > 0 ? Math.round((positiveCount / totalChapters) * 100) : 0;
 
-    if (onLaunchPracticeExam && targetIds.length > 0) {
-      onLaunchPracticeExam(selectedPaperId, targetIds);
-    }
+    return {
+      totalChapters,
+      assessedCount,
+      positiveCount,
+      priorityCount,
+      coveragePct,
+      masteryPct,
+      counts
+    };
   };
 
-  // Student Next-Exam Pacing Target
-  const targetPaperRecord = paperRecords.find((p) => p.paperId === selectedPaperId);
-  const plannedSession = targetPaperRecord?.examSession || 'Dec 2026';
-  const weakCount = topicStats.filter((t) => t.status === 'needs_revision').length;
+  // Filtered and sorted papers for overview
+  const displayedPapers = useMemo(() => {
+    let list = ACCA_SYLLABUS_PAPERS.filter(paper => {
+      // Stage filter
+      if (selectedStageFilter !== 'all') {
+        if (!paper.stageName?.startsWith(selectedStageFilter)) return false;
+      }
+      // Text search: matches paper code, paper name, or any chapter in it
+      if (paperSearchQuery.trim()) {
+        const q = paperSearchQuery.toLowerCase();
+        const codeMatch = paper.code.toLowerCase().includes(q);
+        const nameMatch = paper.name.toLowerCase().includes(q);
+        const chMatch = paper.chapters.some(c => c.title.toLowerCase().includes(q));
+        if (!codeMatch && !nameMatch && !chMatch) return false;
+      }
+      return true;
+    });
+
+    // Sorting
+    list = [...list].sort((a, b) => {
+      if (paperSortBy === 'code') {
+        return a.code.localeCompare(b.code);
+      }
+      if (paperSortBy === 'name') {
+        return a.name.localeCompare(b.name);
+      }
+      const statsA = getPaperStats(a);
+      const statsB = getPaperStats(b);
+      if (paperSortBy === 'lowest_mastery') {
+        return statsA.masteryPct - statsB.masteryPct;
+      }
+      if (paperSortBy === 'most_revision') {
+        return statsB.priorityCount - statsA.priorityCount;
+      }
+      if (paperSortBy === 'highest_coverage') {
+        return statsB.coveragePct - statsA.coveragePct;
+      }
+      return 0;
+    });
+
+    return list;
+  }, [paperSearchQuery, selectedStageFilter, paperSortBy, masteryMap]);
+
+  // Selected Paper Details View
+  const selectedPaper = useMemo(() => {
+    if (!selectedPaperId) return null;
+    return getPaperById(selectedPaperId) || null;
+  }, [selectedPaperId]);
+
+  const selectedPaperStats = useMemo(() => {
+    if (!selectedPaper) return null;
+    return getPaperStats(selectedPaper);
+  }, [selectedPaper, masteryMap]);
+
+  // Filtered chapters for detailed view
+  const displayedChapters = useMemo(() => {
+    if (!selectedPaper) return [];
+    return selectedPaper.chapters.filter(ch => {
+      const id = `${selectedPaper.id}-ch-${ch.chapterNumber}`;
+      const rec = masteryMap.get(id);
+      const st = rec?.status || 'not_assessed';
+      const cfg = getStatusConfig(st);
+
+      if (chapterSearchQuery.trim()) {
+        const q = chapterSearchQuery.toLowerCase();
+        const matchTitle = ch.title.toLowerCase().includes(q);
+        const matchNum = ch.chapterNumber.toString().includes(q);
+        if (!matchTitle && !matchNum) return false;
+      }
+
+      if (chapterStatusFilter === 'not_assessed') {
+        return st === 'not_assessed';
+      }
+      if (chapterStatusFilter === 'priority') {
+        return cfg.isPriorityRevision;
+      }
+      if (chapterStatusFilter === 'positive') {
+        return cfg.isPositiveMastery;
+      }
+      return true;
+    });
+  }, [selectedPaper, chapterSearchQuery, chapterStatusFilter, masteryMap]);
+
+  // Handle changing chapter status
+  const handleUpdateStatus = async (
+    paper: SyllabusPaper,
+    chapterNumber: number,
+    chapterTitle: string,
+    newStatus: ChapterMasteryStatus
+  ) => {
+    await setChapterStatus(paper.id, chapterNumber, chapterTitle, newStatus);
+  };
+
+  // Handle saving notes for a chapter
+  const handleSaveNotes = async (paperId: string, chapterNumber: number, chapterTitle: string) => {
+    const id = `${paperId}-ch-${chapterNumber}`;
+    const existing = masteryMap.get(id);
+    const status = existing?.status || 'not_assessed';
+    await setChapterStatus(paperId, chapterNumber, chapterTitle, status, noteDraftText.trim() || undefined);
+    setExpandedNoteChapterId(null);
+  };
+
+  // Reset chapter status
+  const handleResetStatus = async (id: string) => {
+    await resetChapterStatus(id);
+  };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
-      {/* Top Header Card */}
-      <div className="bg-white dark:bg-charcoal-900 rounded-2xl border border-charcoal-200 dark:border-charcoal-700/80 p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-acca-50 dark:bg-acca-950/40 text-acca-600 dark:text-acca-400 flex items-center justify-center border border-acca-200 dark:border-acca-900">
-              <Brain className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-charcoal-900 dark:text-charcoal-100">
-                  Progress
-                </h1>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-charcoal-100 dark:bg-charcoal-800 text-charcoal-700 dark:text-charcoal-300">
-                  Catchy ACCA · by ly77ee
-                </span>
-              </div>
-              <p className="text-xs text-charcoal-500 dark:text-charcoal-400">
-                Identify knowledge gaps, track doubtful questions, and target weak syllabus topics
-              </p>
-            </div>
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* 1. Header Section */}
+      <div className="bg-[#1e1e24] p-5 rounded-2xl border border-[#2a2a34] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="p-2.5 rounded-xl bg-acca-red/10 border border-acca-red/20 text-acca-red">
+            <BookOpen className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+              Progress
+              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-[#25252e] text-gray-300 border border-[#2a2a34]">
+                Syllabus Mastery
+              </span>
+            </h1>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Track your syllabus coverage and understanding across all {TOTAL_SYLLABUS_PAPERS} ACCA papers and {TOTAL_SYLLABUS_CHAPTERS} chapters.
+            </p>
           </div>
         </div>
 
-        {/* Paper Selector & Quick Action */}
-        <div className="flex flex-wrap items-center gap-3">
-          <select
-            value={selectedPaperId}
-            onChange={(e) => setSelectedPaperId(e.target.value)}
-            className="text-xs font-bold bg-white dark:bg-charcoal-800 border border-charcoal-200 dark:border-charcoal-700 rounded-xl px-3 py-2 text-charcoal-900 dark:text-charcoal-100 outline-none focus:border-acca-600"
-          >
-            {version.papers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.id} — {p.name}
-              </option>
-            ))}
-          </select>
-
+        {selectedPaper && (
           <button
-            onClick={handleLaunchWeakTopicExam}
-            className="text-xs font-bold bg-acca-600 hover:bg-acca-700 text-white px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 shadow-sm"
+            onClick={() => {
+              setSelectedPaperId(null);
+              setChapterSearchQuery('');
+              setChapterStatusFilter('all');
+            }}
+            className="flex items-center space-x-1.5 px-3 py-2 bg-[#141419] hover:bg-[#25252e] text-gray-300 hover:text-white rounded-xl text-xs font-semibold border border-[#2a2a34] transition-all self-start sm:self-auto"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            Practice Weak Topics ({weakCount})
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to All Papers</span>
           </button>
+        )}
+      </div>
+
+      {/* 2. Global Progress Metrics Ribbon */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        {/* Papers Count */}
+        <div className="bg-[#1e1e24] p-4 rounded-xl border border-[#2a2a34]">
+          <div className="flex items-center justify-between text-gray-400 text-xs mb-1 font-semibold">
+            <span>Syllabus Papers</span>
+            <Layers className="w-3.5 h-3.5 text-gray-500" />
+          </div>
+          <div className="text-2xl font-black text-white">{TOTAL_SYLLABUS_PAPERS}</div>
+          <div className="text-[11px] text-gray-400 mt-0.5">
+            {TOTAL_SYLLABUS_CHAPTERS} total chapters
+          </div>
+        </div>
+
+        {/* Assessed Syllabus Coverage */}
+        <div className="bg-[#1e1e24] p-4 rounded-xl border border-[#2a2a34]">
+          <div className="flex items-center justify-between text-gray-400 text-xs mb-1 font-semibold">
+            <span>Syllabus Coverage</span>
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+          <div className="text-2xl font-black text-white">{globalStats.coveragePct}%</div>
+          <div className="text-[11px] text-gray-400 mt-0.5" title="Assessed coverage = chapters rated other than Not assessed ÷ total chapters">
+            {globalStats.assessedCount} of {TOTAL_SYLLABUS_CHAPTERS} chapters rated
+          </div>
+        </div>
+
+        {/* Positive Syllabus Mastery */}
+        <div className="bg-[#1e1e24] p-4 rounded-xl border border-[#2a2a34]">
+          <div className="flex items-center justify-between text-gray-400 text-xs mb-1 font-semibold">
+            <span>Syllabus Mastery</span>
+            <Award className="w-3.5 h-3.5 text-cyan-400" />
+          </div>
+          <div className="text-2xl font-black text-white">{globalStats.masteryPct}%</div>
+          <div className="text-[11px] text-gray-400 mt-0.5">
+            {globalStats.positiveMasteryCount} good, well understood, or excellent
+          </div>
+        </div>
+
+        {/* Priority Revision Count */}
+        <div className="bg-[#1e1e24] p-4 rounded-xl border border-[#2a2a34]">
+          <div className="flex items-center justify-between text-gray-400 text-xs mb-1 font-semibold">
+            <span>Priority Revision</span>
+            <Flame className="w-3.5 h-3.5 text-amber-400" />
+          </div>
+          <div className="text-2xl font-black text-amber-400">{globalStats.priorityCount}</div>
+          <div className="text-[11px] text-gray-400 mt-0.5">
+            Substantial work, doubtful, or revision
+          </div>
+        </div>
+
+        {/* Not Assessed Count */}
+        <div className="bg-[#1e1e24] p-4 rounded-xl border border-[#2a2a34] col-span-2 sm:col-span-1">
+          <div className="flex items-center justify-between text-gray-400 text-xs mb-1 font-semibold">
+            <span>Not Assessed</span>
+            <HelpCircle className="w-3.5 h-3.5 text-gray-500" />
+          </div>
+          <div className="text-2xl font-black text-gray-400">
+            {globalStats.countsByStatus.not_assessed}
+          </div>
+          <div className="text-[11px] text-gray-400 mt-0.5">
+            Chapters awaiting rating
+          </div>
         </div>
       </div>
 
-      {/* Primary Navigation Tabs */}
-      <div className="flex border-b border-charcoal-200 dark:border-charcoal-700 gap-4 text-xs font-semibold select-none">
-        <button
-          onClick={() => setActiveTab('mistakes')}
-          className={`pb-3 px-1 border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'mistakes'
-              ? 'border-acca-600 text-acca-600 dark:text-acca-400'
-              : 'border-transparent text-charcoal-500 hover:text-charcoal-900 dark:hover:text-charcoal-200'
-          }`}
-        >
-          <AlertTriangle className="w-4 h-4" />
-          Mistake & Doubt Journal ({mistakeJournalQuestions.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('topics')}
-          className={`pb-3 px-1 border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'topics'
-              ? 'border-acca-600 text-acca-600 dark:text-acca-400'
-              : 'border-transparent text-charcoal-500 hover:text-charcoal-900 dark:hover:text-charcoal-200'
-          }`}
-        >
-          <BarChart3 className="w-4 h-4" />
-          Topic Mastery Matrix
-        </button>
-        <button
-          onClick={() => setActiveTab('planner')}
-          className={`pb-3 px-1 border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'planner'
-              ? 'border-acca-600 text-acca-600 dark:text-acca-400'
-              : 'border-transparent text-charcoal-500 hover:text-charcoal-900 dark:hover:text-charcoal-200'
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          Exam Target & Recommendations
-        </button>
-      </div>
-
-      {/* Tab 1: Mistake & Doubt Journal */}
-      {activeTab === 'mistakes' && (
-        <div className="space-y-4">
-          {/* Sub-filter pills */}
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <Filter className="w-3.5 h-3.5 text-charcoal-400" />
-              <button
-                onClick={() => setStatusFilter('all')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  statusFilter === 'all'
-                    ? 'bg-charcoal-900 text-white dark:bg-charcoal-100 dark:text-charcoal-900'
-                    : 'bg-charcoal-100 dark:bg-charcoal-800 text-charcoal-600 hover:bg-charcoal-200'
-                }`}
-              >
-                All Issues
-              </button>
-              <button
-                onClick={() => setStatusFilter('doubtful')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  statusFilter === 'doubtful'
-                    ? 'bg-amber-600 text-white'
-                    : 'bg-charcoal-100 dark:bg-charcoal-800 text-charcoal-600 hover:bg-charcoal-200'
-                }`}
-              >
-                Flagged Doubts
-              </button>
-              <button
-                onClick={() => setStatusFilter('failed')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  statusFilter === 'failed'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-charcoal-100 dark:bg-charcoal-800 text-charcoal-600 hover:bg-charcoal-200'
-                }`}
-              >
-                Low Exam Scores (&lt;50%)
-              </button>
+      {/* 3. Priority Revision Quick Access (if any priority chapters exist) */}
+      {!selectedPaper && globalStats.priorityChapters.length > 0 && (
+        <div className="bg-[#1e1e24] p-4 rounded-2xl border border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-transparent space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Flame className="w-4 h-4 text-amber-400" />
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+                Priority Revision Focus ({globalStats.priorityChapters.length})
+              </h2>
             </div>
-            <span className="text-charcoal-400 text-[11px]">
-              Showing {mistakeJournalQuestions.length} flagged item(s) for {selectedPaperId}
+            <span className="text-[11px] text-gray-400">
+              Chapters you flagged as needing attention
             </span>
           </div>
 
-          {mistakeJournalQuestions.length === 0 ? (
-            <div className="text-center py-16 bg-white dark:bg-charcoal-900 rounded-2xl border border-charcoal-200 dark:border-charcoal-700/80 p-6 space-y-3">
-              <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
-              <h3 className="font-bold text-charcoal-800 dark:text-charcoal-200 text-sm">
-                No Active Doubts or Failed Attempts!
-              </h3>
-              <p className="text-xs text-charcoal-500 max-w-md mx-auto">
-                You have resolved all flagged doubts for {selectedPaperId}. Keep up the great work or run a mock CBE exam to test yourself under timed conditions.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3">
-              {mistakeJournalQuestions.map((q) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
+            {globalStats.priorityChapters.map(item => {
+              const cfg = getStatusConfig(item.status);
+              return (
                 <div
-                  key={q.id}
-                  className="bg-white dark:bg-charcoal-900 border border-charcoal-200 dark:border-charcoal-700/80 rounded-xl p-4 shadow-2xs hover:border-acca-500/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedPaperId(item.paper.id);
+                    setChapterSearchQuery(item.chapterTitle);
+                  }}
+                  className="p-2.5 rounded-xl bg-[#141419] border border-[#2a2a34] hover:border-amber-500/40 cursor-pointer flex items-center justify-between transition-all group"
                 >
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs text-charcoal-900 dark:text-charcoal-100">
-                        {q.questionNumber}: {q.title}
+                  <div className="min-w-0 mr-2 truncate">
+                    <div className="flex items-center space-x-1.5 mb-0.5">
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-acca-red text-white">
+                        {item.paper.id}
                       </span>
-                      {q.isDoubt && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-300 text-[10px] font-bold">
-                          Flagged Doubt
+                      <span className="text-[10px] text-gray-400">
+                        Ch. {item.chapterNumber}
+                      </span>
+                    </div>
+                    <div className="text-xs font-semibold text-gray-200 truncate group-hover:text-white">
+                      {item.chapterTitle}
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded shrink-0 border ${cfg.badgeBg} ${cfg.badgeText} ${cfg.badgeBorder}`}>
+                    {cfg.shortLabel}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 4. MAIN VIEW: All Papers Overview OR Detailed Paper Chapter View */}
+      {!selectedPaper ? (
+        /* ================= OVERVIEW MODE ================= */
+        <div className="space-y-4">
+          {/* Controls: Search, Stage Filter, Sort */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#1e1e24] p-3.5 rounded-2xl border border-[#2a2a34]">
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-500" />
+              <input
+                type="text"
+                value={paperSearchQuery}
+                onChange={e => setPaperSearchQuery(e.target.value)}
+                placeholder="Search papers or syllabus chapters..."
+                className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-500 outline-none focus:border-acca-red"
+              />
+            </div>
+
+            {/* Stage Filter */}
+            <div className="flex items-center space-x-2">
+              <select
+                value={selectedStageFilter}
+                onChange={e => setSelectedStageFilter(e.target.value as any)}
+                className="bg-[#141419] border border-[#2a2a34] rounded-xl px-2.5 py-1.5 text-xs text-gray-300 outline-none focus:border-acca-red"
+              >
+                <option value="all">All Stages (15)</option>
+                <option value="Applied Knowledge">Applied Knowledge (BT, MA, FA)</option>
+                <option value="Applied Skills">Applied Skills (LW, PM, TX, FR, AA, FM)</option>
+                <option value="Strategic Professional">Strategic Professional</option>
+              </select>
+
+              {/* Sort By */}
+              <select
+                value={paperSortBy}
+                onChange={e => setPaperSortBy(e.target.value as any)}
+                className="bg-[#141419] border border-[#2a2a34] rounded-xl px-2.5 py-1.5 text-xs text-gray-300 outline-none focus:border-acca-red"
+              >
+                <option value="code">Sort by Code (A-Z)</option>
+                <option value="name">Sort by Name</option>
+                <option value="lowest_mastery">Lowest Mastery</option>
+                <option value="most_revision">Most Needs Revision</option>
+                <option value="highest_coverage">Highest Coverage</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Papers Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {displayedPapers.map(paper => {
+              const stats = getPaperStats(paper);
+
+              return (
+                <div
+                  key={paper.id}
+                  onClick={() => setSelectedPaperId(paper.id)}
+                  className="bg-[#1e1e24] rounded-2xl border border-[#2a2a34] hover:border-[#3d3d4e] p-5 cursor-pointer transition-all hover:shadow-lg group flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Top Row: Paper Code, Stage, Total Chapters */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-black px-2.5 py-1 rounded-xl bg-acca-red text-white shadow-xs">
+                          {paper.code}
                         </span>
-                      )}
-                      <span className="text-[10px] font-semibold text-charcoal-400">
-                        {q.availableMarks || 2} Marks
+                        <div>
+                          <span className="text-[10px] text-gray-400 font-semibold block uppercase">
+                            {paper.stageName}
+                          </span>
+                        </div>
+                      </div>
+
+                      <span className="text-xs font-semibold text-gray-400 bg-[#141419] px-2 py-0.5 rounded-lg border border-[#2a2a34]">
+                        {stats.totalChapters} chapters
                       </span>
                     </div>
 
-                    <p className="text-xs text-charcoal-600 dark:text-charcoal-400 line-clamp-2">
-                      {q.notes || q.title}
-                    </p>
+                    {/* Paper Name */}
+                    <h3 className="text-base font-bold text-white group-hover:text-acca-red transition-colors line-clamp-1">
+                      {paper.name}
+                    </h3>
 
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {(q.topicTags || []).map((t: string, idx: number) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 rounded bg-charcoal-100 dark:bg-charcoal-800 text-charcoal-600 dark:text-charcoal-400 text-[10px]"
-                        >
-                          {t}
-                        </span>
-                      ))}
+                    {/* Progress Bars: Coverage & Mastery */}
+                    <div className="space-y-2 my-4">
+                      {/* Coverage Bar */}
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-gray-400">Assessed Coverage</span>
+                          <span className="font-bold text-white">{stats.coveragePct}% ({stats.assessedCount}/{stats.totalChapters})</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-[#141419] rounded-full overflow-hidden border border-[#2a2a34]">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                            style={{ width: `${stats.coveragePct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Mastery Bar */}
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-gray-400">Mastery (Good+)</span>
+                          <span className="font-bold text-cyan-400">{stats.masteryPct}% ({stats.positiveCount}/{stats.totalChapters})</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-[#141419] rounded-full overflow-hidden border border-[#2a2a34]">
+                          <div
+                            className="h-full bg-cyan-500 rounded-full transition-all duration-300"
+                            style={{ width: `${stats.masteryPct}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => handleToggleDoubt(q)}
-                      className="px-3 py-1.5 rounded-lg border border-charcoal-200 dark:border-charcoal-700 text-xs font-semibold text-charcoal-700 dark:text-charcoal-300 hover:bg-charcoal-50 dark:hover:bg-charcoal-800 transition-colors flex items-center gap-1.5"
-                    >
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>{q.isDoubt ? 'Mark Resolved' : 'Mark Doubt'}</span>
-                    </button>
+                  {/* Bottom Stats & Button */}
+                  <div className="pt-3 border-t border-[#2a2a34] flex items-center justify-between text-xs">
+                    <div className="flex items-center space-x-2 text-[11px]">
+                      {stats.priorityCount > 0 ? (
+                        <span className="font-bold text-amber-400 flex items-center gap-1">
+                          <Flame className="w-3 h-3" />
+                          {stats.priorityCount} revision
+                        </span>
+                      ) : (
+                        <span className="text-gray-500">No pending revision</span>
+                      )}
+                    </div>
 
-                    {onOpenQuestionInWriter && (
-                      <button
-                        onClick={() => onOpenQuestionInWriter(q.id)}
-                        className="px-3 py-1.5 rounded-lg bg-charcoal-900 hover:bg-black dark:bg-charcoal-100 dark:hover:bg-white text-white dark:text-charcoal-900 text-xs font-semibold transition-colors flex items-center gap-1.5"
-                      >
-                        <FileEdit className="w-3.5 h-3.5" />
-                        <span>Draft Answer</span>
-                      </button>
-                    )}
+                    <div className="flex items-center text-gray-400 group-hover:text-white font-semibold text-xs space-x-1">
+                      <span>View Chapters</span>
+                      <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
                   </div>
                 </div>
-              ))}
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* ================= DETAILED CHAPTER VIEW ================= */
+        <div className="space-y-5">
+          {/* Paper Banner Header */}
+          {selectedPaperStats && (
+            <div className="bg-[#1e1e24] p-5 rounded-2xl border border-[#2a2a34] space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center space-x-3">
+                  <span className="text-lg font-black px-3 py-1.5 rounded-xl bg-acca-red text-white">
+                    {selectedPaper.code}
+                  </span>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">
+                      {selectedPaper.name}
+                    </h2>
+                    <span className="text-xs text-gray-400">
+                      {selectedPaper.stageName} • {selectedPaper.chapters.length} Syllabus Chapters
+                    </span>
+                  </div>
+                </div>
+
+                {/* Circular Badges */}
+                <div className="flex items-center space-x-6">
+                  <div className="flex items-center space-x-2.5">
+                    <CircularProgress
+                      percentage={selectedPaperStats.coveragePct}
+                      size={42}
+                      strokeWidth={4}
+                      color="#10b981"
+                      trackColor="#2a2a34"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-white">{selectedPaperStats.coveragePct}%</div>
+                      <div className="text-[10px] text-gray-400">Coverage</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2.5">
+                    <CircularProgress
+                      percentage={selectedPaperStats.masteryPct}
+                      size={42}
+                      strokeWidth={4}
+                      color="#06b6d4"
+                      trackColor="#2a2a34"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-cyan-400">{selectedPaperStats.masteryPct}%</div>
+                      <div className="text-[10px] text-gray-400">Mastery</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Breakdown Pills for This Paper */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-3 border-t border-[#2a2a34]">
+                {DEFAULT_MASTERY_STATUS_CONFIGS.map(cfg => {
+                  const count = selectedPaperStats.counts[cfg.id];
+                  return (
+                    <div
+                      key={cfg.id}
+                      className={`p-2 rounded-xl border text-center ${cfg.badgeBg} ${cfg.badgeBorder}`}
+                    >
+                      <div className={`text-xs font-black ${cfg.badgeText}`}>
+                        {count}
+                      </div>
+                      <div className="text-[10px] text-gray-400 truncate mt-0.5">
+                        {cfg.shortLabel}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* Tab 2: Topic Mastery Matrix */}
-      {activeTab === 'topics' && (
-        <div className="bg-white dark:bg-charcoal-900 border border-charcoal-200 dark:border-charcoal-700 rounded-2xl p-6 shadow-xs space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-bold text-sm text-charcoal-900 dark:text-charcoal-100">
-                Syllabus Topic Performance for {selectedPaperId}
-              </h2>
-              <p className="text-xs text-charcoal-500 mt-0.5">
-                Aggregated from your CBE exam attempts and active doubtful flags
-              </p>
+          {/* Chapter Filter & Search Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#1e1e24] p-3.5 rounded-2xl border border-[#2a2a34]">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-500" />
+              <input
+                type="text"
+                value={chapterSearchQuery}
+                onChange={e => setChapterSearchQuery(e.target.value)}
+                placeholder="Search chapters in this paper..."
+                className="w-full bg-[#141419] border border-[#2a2a34] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-500 outline-none focus:border-acca-red"
+              />
             </div>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1.5 text-emerald-600 font-semibold">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Mastered (≥75%)
-              </span>
-              <span className="flex items-center gap-1.5 text-blue-600 font-semibold">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Solid (50-74%)
-              </span>
-              <span className="flex items-center gap-1.5 text-amber-600 font-semibold">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Needs Revision (&lt;50% or doubts)
-              </span>
-            </div>
-          </div>
 
-          <div className="space-y-4">
-            {topicStats.map((topic, idx) => (
-              <div
-                key={idx}
-                className="p-4 bg-charcoal-50 dark:bg-charcoal-800/50 rounded-xl border border-charcoal-200 dark:border-charcoal-700 space-y-2"
+            <div className="flex items-center space-x-1.5 bg-[#141419] p-1 rounded-xl border border-[#2a2a34] text-xs overflow-x-auto">
+              <button
+                onClick={() => setChapterStatusFilter('all')}
+                className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition-all ${
+                  chapterStatusFilter === 'all' ? 'bg-[#25252e] text-white' : 'text-gray-400 hover:text-white'
+                }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-xs text-charcoal-900 dark:text-charcoal-100">
-                      {topic.topicName}
-                    </span>
-                    <div className="text-[11px] text-charcoal-500">
-                      {topic.totalAttempts} exam attempt(s) · {topic.doubtsCount} active doubt(s)
-                    </div>
-                  </div>
+                All ({selectedPaper.chapters.length})
+              </button>
+              <button
+                onClick={() => setChapterStatusFilter('not_assessed')}
+                className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition-all ${
+                  chapterStatusFilter === 'not_assessed' ? 'bg-[#25252e] text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Not Assessed ({selectedPaperStats?.counts.not_assessed || 0})
+              </button>
+              <button
+                onClick={() => setChapterStatusFilter('priority')}
+                className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition-all ${
+                  chapterStatusFilter === 'priority' ? 'bg-[#25252e] text-amber-400' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Priority Revision ({selectedPaperStats?.priorityCount || 0})
+              </button>
+              <button
+                onClick={() => setChapterStatusFilter('positive')}
+                className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition-all ${
+                  chapterStatusFilter === 'positive' ? 'bg-[#25252e] text-cyan-400' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Good or Better ({selectedPaperStats?.positiveCount || 0})
+              </button>
+            </div>
+          </div>
 
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                        topic.status === 'mastered'
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                          : topic.status === 'solid'
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
-                          : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                      }`}
-                    >
-                      {topic.status === 'mastered'
-                        ? 'Mastered'
-                        : topic.status === 'solid'
-                        ? 'Solid'
-                        : 'Needs Revision'}
-                    </span>
-                    <span className="text-xs font-mono font-bold text-charcoal-700 dark:text-charcoal-300 w-12 text-right">
-                      {topic.averageScorePercent}%
-                    </span>
-                  </div>
-                </div>
+          {/* Chapters List */}
+          <div className="bg-[#1e1e24] p-4 rounded-2xl border border-[#2a2a34] space-y-2">
+            {displayedChapters.length > 0 ? (
+              displayedChapters.map(ch => {
+                const id = `${selectedPaper.id}-ch-${ch.chapterNumber}`;
+                const record = masteryMap.get(id);
+                const currentStatus: ChapterMasteryStatus = record?.status || 'not_assessed';
+                const statusCfg = getStatusConfig(currentStatus);
+                const isNoteOpen = expandedNoteChapterId === id;
 
-                {/* Progress bar */}
-                <div className="w-full bg-charcoal-200 dark:bg-charcoal-700 h-2 rounded-full overflow-hidden">
+                return (
                   <div
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      topic.status === 'mastered'
-                        ? 'bg-emerald-500'
-                        : topic.status === 'solid'
-                        ? 'bg-blue-500'
-                        : 'bg-amber-500'
-                    }`}
-                    style={{ width: `${Math.max(5, topic.averageScorePercent)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 3: Exam Target & Recommendations */}
-      {activeTab === 'planner' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-charcoal-900 border border-charcoal-200 dark:border-charcoal-700 rounded-2xl p-6 shadow-xs space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-acca-50 dark:bg-acca-950/40 text-acca-600 flex items-center justify-center">
-                <Target className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-sm text-charcoal-900 dark:text-charcoal-100">
-                  Target Exam Pacing
-                </h3>
-                <p className="text-xs text-charcoal-500">
-                  Syllabus completion target for {selectedPaperId}
-                </p>
-              </div>
-            </div>
-
-            <div className="p-4 bg-charcoal-50 dark:bg-charcoal-800 rounded-xl space-y-2 text-xs">
-              <div className="flex justify-between text-charcoal-600 dark:text-charcoal-400">
-                <span>Planned Exam Session:</span>
-                <span className="font-bold text-charcoal-900 dark:text-charcoal-100">
-                  {plannedSession}
-                </span>
-              </div>
-              <div className="flex justify-between text-charcoal-600 dark:text-charcoal-400">
-                <span>Total Questions in Bank:</span>
-                <span className="font-bold text-charcoal-900 dark:text-charcoal-100">
-                  {allQuestions.filter((q) => q.paperId === selectedPaperId).length}
-                </span>
-              </div>
-              <div className="flex justify-between text-charcoal-600 dark:text-charcoal-400">
-                <span>Completed Exam Mocks:</span>
-                <span className="font-bold text-charcoal-900 dark:text-charcoal-100">
-                  {examAttempts.filter((a) => a.paperId === selectedPaperId).length}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <p className="font-bold text-charcoal-800 dark:text-charcoal-200">
-                Recommended Weekly Schedule:
-              </p>
-              <ul className="space-y-1.5 text-charcoal-600 dark:text-charcoal-400">
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>Aim for 4–6 practice questions per week in your weakest topics.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>Complete at least 1 full timed CBE practice exam every 2 weeks.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>Draft at least one 20-mark essay answer per week in Answer Writer.</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-charcoal-900 border border-charcoal-200 dark:border-charcoal-700 rounded-2xl p-6 shadow-xs space-y-4 flex flex-col justify-between">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-charcoal-900 dark:text-charcoal-100">
-                    High-Priority Knowledge Areas
-                  </h3>
-                  <p className="text-xs text-charcoal-500">
-                    Topics requiring immediate review before the exam
-                  </p>
-                </div>
-              </div>
-
-              {weakCount === 0 ? (
-                <p className="text-xs text-charcoal-500 italic py-4">
-                  No critical weak topics flagged right now. Keep reinforcing your strong subjects!
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {topicStats
-                    .filter((t) => t.status === 'needs_revision')
-                    .map((t, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl text-xs flex items-center justify-between"
-                      >
-                        <span className="font-semibold text-amber-900 dark:text-amber-200">
-                          {t.topicName}
+                    key={id}
+                    className="p-3.5 rounded-xl bg-[#141419] border border-[#2a2a34] hover:border-[#383846] transition-all space-y-2"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      {/* Left: Chapter Number & Title */}
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-[#1e1e24] text-gray-400 border border-[#2a2a34] shrink-0">
+                          Ch. {ch.chapterNumber}
                         </span>
-                        <span className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
-                          {t.doubtsCount} doubt(s)
-                        </span>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-xs font-bold text-white truncate">
+                            {ch.title}
+                          </h4>
+                          {record?.notes && !isNoteOpen && (
+                            <p className="text-[11px] text-gray-400 truncate mt-0.5 italic">
+                              Note: {record.notes}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    ))}
-                </div>
-              )}
-            </div>
 
-            <button
-              onClick={handleLaunchWeakTopicExam}
-              className="w-full py-2.5 bg-neutral-900 hover:bg-black dark:bg-neutral-100 dark:hover:bg-white text-white dark:text-neutral-900 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
-              <Sparkles className="w-4 h-4 text-acca-500" />
-              <span>Launch Targeted Revision Exam</span>
-            </button>
+                      {/* Right: Interactive Status Selector & Controls */}
+                      <div className="flex items-center space-x-2 shrink-0">
+                        {/* Status Dropdown */}
+                        <select
+                          value={currentStatus}
+                          onChange={e =>
+                            handleUpdateStatus(
+                              selectedPaper,
+                              ch.chapterNumber,
+                              ch.title,
+                              e.target.value as ChapterMasteryStatus
+                            )
+                          }
+                          className={`text-xs font-bold rounded-xl px-2.5 py-1.5 outline-none border transition-all cursor-pointer ${statusCfg.badgeBg} ${statusCfg.badgeText} ${statusCfg.badgeBorder}`}
+                        >
+                          {DEFAULT_MASTERY_STATUS_CONFIGS.map(cfg => (
+                            <option key={cfg.id} value={cfg.id} className="bg-[#1e1e24] text-white">
+                              {cfg.label}
+                            </option>
+                          ))}
+                        </select>
+
+                        {/* Toggle Notes */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isNoteOpen) {
+                              setExpandedNoteChapterId(null);
+                            } else {
+                              setExpandedNoteChapterId(id);
+                              setNoteDraftText(record?.notes || '');
+                            }
+                          }}
+                          className={`px-2 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                            record?.notes
+                              ? 'bg-acca-red/10 border-acca-red/30 text-acca-red'
+                              : 'bg-[#1e1e24] border-[#2a2a34] text-gray-400 hover:text-white'
+                          }`}
+                          title="Add or edit study notes for this chapter"
+                        >
+                          {record?.notes ? 'Edit Note' : '+ Note'}
+                        </button>
+
+                        {/* Reset button if assessed */}
+                        {currentStatus !== 'not_assessed' && (
+                          <button
+                            type="button"
+                            onClick={() => handleResetStatus(id)}
+                            className="p-1.5 text-gray-500 hover:text-gray-300 rounded-lg hover:bg-[#1e1e24] transition-colors"
+                            title="Reset to Not assessed"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Expandable Chapter Study Notes */}
+                    {isNoteOpen && (
+                      <div className="pt-2 border-t border-[#2a2a34] space-y-2">
+                        <textarea
+                          rows={2}
+                          value={noteDraftText}
+                          onChange={e => setNoteDraftText(e.target.value)}
+                          placeholder="Add revision hints, key standards, formulas, or tricky areas for this chapter..."
+                          className="w-full bg-[#1e1e24] border border-[#2a2a34] rounded-xl p-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-acca-red"
+                        />
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedNoteChapterId(null)}
+                            className="px-3 py-1 bg-[#1e1e24] hover:bg-[#25252e] text-gray-400 rounded-lg text-xs"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveNotes(selectedPaper.id, ch.chapterNumber, ch.title)}
+                            className="px-3 py-1 bg-acca-red hover:bg-acca-red-hover text-white rounded-lg text-xs font-bold"
+                          >
+                            Save Note
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="p-8 text-center text-xs text-gray-500">
+                No chapters matching your current search or filter.
+              </div>
+            )}
           </div>
         </div>
       )}

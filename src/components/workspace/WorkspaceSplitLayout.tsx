@@ -112,6 +112,7 @@ export const WorkspaceSplitLayout: React.FC<WorkspaceSplitLayoutProps> = ({
       const rawRatio = (relativeX / rect.width) * 100;
       const clamped = Math.max(MIN_SPLIT_RATIO, Math.min(MAX_SPLIT_RATIO, rawRatio));
       setSplitRatio(clamped);
+      window.dispatchEvent(new Event('resize'));
     };
 
     const handleMouseUp = () => {
@@ -121,6 +122,7 @@ export const WorkspaceSplitLayout: React.FC<WorkspaceSplitLayoutProps> = ({
       } catch {
         // Ignore storage errors
       }
+      window.dispatchEvent(new Event('resize'));
     };
 
     window.addEventListener('mousemove', handleMouseMove);

@@ -614,9 +614,6 @@ export const CatchyNotes: React.FC<CatchyNotesProps> = ({ version }) => {
           </div>
           <span className="text-sm font-black text-white tracking-tight flex items-center gap-2">
             Catchy Notes
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[#141419] text-gray-400 border border-[#2a2a34]">
-              Apple Notes Inspired
-            </span>
           </span>
         </div>
 
