@@ -1,6 +1,32 @@
 import { SpreadsheetWorkbook, SpreadsheetSheet, CellData, CellFormat } from '../types';
 import { colIndexToLetter, colLetterToIndex, parseCellAddress } from './formulaEngine';
 import { defaultContext, execfunction } from '@fortune-sheet/core';
+import * as fortuneCore from '@fortune-sheet/core';
+
+// Global defensive safeguard against null or unmounted element in FortuneSheet moveToEnd
+try {
+  const coreObj: any = (globalThis as any).fortuneCore || fortuneCore;
+  if (coreObj && typeof coreObj.moveToEnd === 'function') {
+    const desc = Object.getOwnPropertyDescriptor(coreObj, 'moveToEnd');
+    if (desc && (desc.writable || desc.configurable)) {
+      const origMoveToEnd = coreObj.moveToEnd;
+      Object.defineProperty(coreObj, 'moveToEnd', {
+        value: function safeMoveToEnd(obj: any) {
+          if (!obj || typeof obj !== 'object' || !('innerHTML' in obj)) return;
+          try {
+            return origMoveToEnd.call(this, obj);
+          } catch (err) {
+            console.warn('Safely handled FortuneSheet moveToEnd invocation:', err);
+          }
+        },
+        writable: true,
+        configurable: true
+      });
+    }
+  }
+} catch {
+  // Sealed module namespace in some runtimes
+}
 
 export interface FortuneCell {
   v?: any;

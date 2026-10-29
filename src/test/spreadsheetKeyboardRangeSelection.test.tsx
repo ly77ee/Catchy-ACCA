@@ -229,4 +229,145 @@ describe('FortuneSheet Keyboard Cell-Range Selection Acceptance Tests', () => {
     cellInput.dispatchEvent(enterEvent);
     expect(cellInput.innerText).toMatch(/\)$/);
   });
+
+  it('8. User Acceptance Scenario: A1=10, A2=20, A3=SUM(A1:A2) = 30, change A1=15 -> 35', () => {
+    // 1. Initial state: A1=10, A2=20
+    const sheets = createDefaultFortuneSheets('FR');
+    sheets[0].celldata = [
+      { r: 0, c: 0, v: { v: 10, m: '10' } }, // A1
+      { r: 1, c: 0, v: { v: 20, m: '20' } }, // A2
+    ];
+
+    // 2. Select A3 (row 2, col 0), enter "=SUM("
+    const editingCell = { r: 2, c: 0 };
+    let input = '=SUM(';
+
+    // 3. Press ArrowUp to navigate to A2
+    const step1 = computeNextFormulaReference(input, 'ArrowUp', false, null, editingCell);
+    expect(step1).not.toBeNull();
+    expect(step1?.updatedFormula).toBe('=SUM(A2');
+
+    // 4. Press ArrowUp again to navigate to A1
+    const step2 = computeNextFormulaReference(step1!.updatedFormula, 'ArrowUp', false, step1!.nextState, editingCell);
+    expect(step2).not.toBeNull();
+    expect(step2?.updatedFormula).toBe('=SUM(A1');
+
+    // 5. Press Shift + ArrowDown to extend range to A1:A2
+    const step3 = computeNextFormulaReference(step2!.updatedFormula, 'ArrowDown', true, step2!.nextState, editingCell);
+    expect(step3).not.toBeNull();
+    expect(step3?.updatedFormula).toBe('=SUM(A1:A2');
+
+    // 6. Complete formula with closing parenthesis: "=SUM(A1:A2)"
+    const completedFormula = `${step3!.updatedFormula})`;
+    expect(completedFormula).toBe('=SUM(A1:A2)');
+
+    // 7. Calculate result in A3 -> must equal 30
+    const evalResult1 = evaluateFortuneFormula(completedFormula, sheets, 2, 0, sheets[0].id);
+    expect(evalResult1.success).toBe(true);
+    expect(evalResult1.value).toBe(30);
+
+    // 8. Change input cell A1 to 15
+    sheets[0].celldata[0].v = { v: 15, m: '15' };
+
+    // 9. Dynamic recalculation -> A3 must now equal 35
+    const evalResult2 = evaluateFortuneFormula(completedFormula, sheets, 2, 0, sheets[0].id);
+    expect(evalResult2.success).toBe(true);
+    expect(evalResult2.value).toBe(35);
+  });
+
+  it('9. Works with other formulas: =AVERAGE(, =MAX(, =MIN(, and =A1+B1', () => {
+    const sheets = createDefaultFortuneSheets('FR');
+    sheets[0].celldata = [
+      { r: 0, c: 0, v: { v: 15, m: '15' } }, // A1
+      { r: 1, c: 0, v: { v: 25, m: '25' } }, // A2
+      { r: 0, c: 1, v: { v: 10, m: '10' } }, // B1
+    ];
+    const editingCell = { r: 2, c: 0 };
+
+    // =AVERAGE(
+    const avgStep = computeNextFormulaReference('=AVERAGE(', 'ArrowUp', false, null, editingCell);
+    expect(avgStep?.updatedFormula).toBe('=AVERAGE(A2');
+    const avgRange = computeNextFormulaReference(avgStep!.updatedFormula, 'ArrowUp', true, avgStep!.nextState, editingCell);
+    expect(avgRange?.updatedFormula).toBe('=AVERAGE(A1:A2');
+    const avgCalc = evaluateFortuneFormula(`${avgRange!.updatedFormula})`, sheets, 2, 0);
+    expect(avgCalc.value).toBe(20); // (15 + 25) / 2 = 20
+
+    // =MAX(
+    const maxCalc = evaluateFortuneFormula('=MAX(A1:A2)', sheets, 2, 0);
+    expect(maxCalc.value).toBe(25);
+
+    // =MIN(
+    const minCalc = evaluateFortuneFormula('=MIN(A1:A2)', sheets, 2, 0);
+    expect(minCalc.value).toBe(15);
+
+    // Arithmetic expression: =A1+B1
+    const addCalc = evaluateFortuneFormula('=A1+B1', sheets, 2, 0);
+    expect(addCalc.value).toBe(25);
+  });
+
+  it('10. Repeated arrow key interactions do not crash and handle fast directional changes cleanly', async () => {
+    const editingCell = { r: 5, c: 5 }; // F6
+    let currentFormula = '=SUM(';
+    let state: any = null;
+
+    // Simulate 20 rapid arrow navigations in various directions with and without shift
+    const directions: Array<{ key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'; shift: boolean }> = [
+      { key: 'ArrowUp', shift: false },
+      { key: 'ArrowUp', shift: false },
+      { key: 'ArrowLeft', shift: false },
+      { key: 'ArrowDown', shift: true },
+      { key: 'ArrowDown', shift: true },
+      { key: 'ArrowRight', shift: true },
+      { key: 'ArrowRight', shift: true },
+      { key: 'ArrowUp', shift: false },
+      { key: 'ArrowLeft', shift: false },
+      { key: 'ArrowDown', shift: false },
+      { key: 'ArrowRight', shift: true },
+    ];
+
+    expect(() => {
+      for (const d of directions) {
+        const next = computeNextFormulaReference(currentFormula, d.key, d.shift, state, editingCell);
+        expect(next).not.toBeNull();
+        currentFormula = next!.updatedFormula;
+        state = next!.nextState;
+      }
+    }).not.toThrow();
+
+    expect(currentFormula).toMatch(/^=SUM\([A-Z]+[0-9]+(:[A-Z]+[0-9]+)?$/);
+  });
+
+  it('11. Visual range highlight box is created and cleaned up on Enter or Escape', async () => {
+    const { container } = render(
+      <SpreadsheetWorkspace
+        version={mockVersion}
+        allQuestions={[]}
+        initialPaperId="FR"
+      />
+    );
+
+    await waitFor(() => {
+      expect(container.querySelector('.catchy-spreadsheet-host')).not.toBeNull();
+    });
+
+    const host = container.querySelector('.catchy-spreadsheet-host') as HTMLDivElement;
+    let cellInput = container.querySelector('.luckysheet-cell-input') as HTMLDivElement;
+    if (!cellInput) {
+      cellInput = document.createElement('div');
+      cellInput.className = 'luckysheet-cell-input';
+      cellInput.tabIndex = 0;
+      host.appendChild(cellInput);
+    }
+
+    cellInput.innerText = '=SUM(';
+    cellInput.focus();
+
+    // ArrowUp triggers visual highlight creation
+    cellInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(container.querySelector('#catchy-formula-keyboard-range')).not.toBeNull();
+
+    // Escape cleans up visual highlight
+    cellInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(container.querySelector('#catchy-formula-keyboard-range')).toBeNull();
+  });
 });

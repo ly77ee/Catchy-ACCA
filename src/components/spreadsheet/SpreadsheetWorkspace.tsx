@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Workbook, WorkbookInstance } from '@fortune-sheet/react';
 import '@fortune-sheet/react/dist/index.css';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import {
   SpreadsheetWorkbook,
   QuestionRecord,
@@ -148,6 +149,52 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
     const container = hostContainerRef.current;
     if (!container) return;
 
+    const clearVisualRangeBox = () => {
+      const existing = container.querySelector('#catchy-formula-keyboard-range');
+      if (existing) {
+        existing.remove();
+      }
+    };
+
+    const updateVisualRangeBox = (
+      rMin: number,
+      rMax: number,
+      cMin: number,
+      cMax: number
+    ) => {
+      const cellArea = container.querySelector('.fortune-cell-area') || container;
+      if (!cellArea) return;
+
+      // FortuneSheet default row height is 20px and col width is 74px
+      const defaultRowHeight = 20;
+      const defaultColWidth = 74;
+
+      const top = rMin * defaultRowHeight;
+      const left = cMin * defaultColWidth;
+      const height = (rMax - rMin + 1) * defaultRowHeight;
+      const width = (cMax - cMin + 1) * defaultColWidth;
+
+      let box = cellArea.querySelector<HTMLDivElement>('#catchy-formula-keyboard-range');
+      if (!box) {
+        box = document.createElement('div');
+        box.id = 'catchy-formula-keyboard-range';
+        box.className = 'fortune-selection-highlight catchy-formula-range-highlight';
+        box.style.position = 'absolute';
+        box.style.border = '2px dashed #2563eb';
+        box.style.backgroundColor = 'rgba(37, 99, 235, 0.12)';
+        box.style.pointerEvents = 'none';
+        box.style.zIndex = '15';
+        box.style.boxSizing = 'border-box';
+        cellArea.appendChild(box);
+      }
+
+      box.style.left = `${left}px`;
+      box.style.top = `${top}px`;
+      box.style.width = `${Math.max(width - 1, 10)}px`;
+      box.style.height = `${Math.max(height - 1, 10)}px`;
+      box.style.display = 'block';
+    };
+
     const handleKeyDownCapture = (e: KeyboardEvent) => {
       const isArrowKey =
         e.key === 'ArrowUp' ||
@@ -167,6 +214,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
 
       if (!isCellInputActive && !isFxInputActive) {
         rangeNavigationStateRef.current = null;
+        clearVisualRangeBox();
         return;
       }
 
@@ -178,6 +226,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
       // Auto-balance closing parenthesis on Enter if formula is unclosed
       if (e.key === 'Enter') {
         rangeNavigationStateRef.current = null;
+        clearVisualRangeBox();
         if (currentText.trim().startsWith('=')) {
           const openCount = (currentText.match(/\(/g) || []).length;
           const closeCount = (currentText.match(/\)/g) || []).length;
@@ -191,6 +240,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
               fxInput.innerText = balanced;
               fxInput.textContent = balanced;
             }
+            targetInput.dispatchEvent(new Event('input', { bubbles: true }));
           }
         }
         return;
@@ -198,6 +248,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
 
       if (e.key === 'Escape') {
         rangeNavigationStateRef.current = null;
+        clearVisualRangeBox();
         return;
       }
 
@@ -205,6 +256,7 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
       if (!isArrowKey) {
         if (e.key !== 'Shift') {
           rangeNavigationStateRef.current = null;
+          clearVisualRangeBox();
         }
         return;
       }
@@ -259,29 +311,24 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
         // Trigger input event to update FortuneSheet internal cache
         targetInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-        // Visually select the referenced range on the grid
+        // Visually highlight the referenced range on the grid WITHOUT mutating firstSelection
         const rMin = Math.min(result.nextState.anchor.r, result.nextState.lead.r);
         const rMax = Math.max(result.nextState.anchor.r, result.nextState.lead.r);
         const cMin = Math.min(result.nextState.anchor.c, result.nextState.lead.c);
         const cMax = Math.max(result.nextState.anchor.c, result.nextState.lead.c);
 
-        try {
-          workbookRef.current?.setSelection([{
-            row: [rMin, rMax],
-            column: [cMin, cMax]
-          }]);
-        } catch {
-          // In case canvas is not mounted
-        }
+        updateVisualRangeBox(rMin, rMax, cMin, cMax);
       } else {
         // Not in reference position; allow normal caret movement
         rangeNavigationStateRef.current = null;
+        clearVisualRangeBox();
       }
     };
 
     container.addEventListener('keydown', handleKeyDownCapture, { capture: true });
     return () => {
       container.removeEventListener('keydown', handleKeyDownCapture, { capture: true });
+      clearVisualRangeBox();
     };
   }, [isLoading]);
 
@@ -637,16 +684,21 @@ export const SpreadsheetWorkspace: React.FC<SpreadsheetWorkspaceProps> = ({
           </div>
         ) : (
           <div ref={hostContainerRef} className="catchy-spreadsheet-host w-full h-full">
-            <Workbook
-              ref={workbookRef}
-              data={sheetData}
-              onChange={handleSheetChange}
-              showToolbar={true}
-              showFormulaBar={true}
-              showSheetTabs={true}
-              allowEdit={true}
-              lang="en"
-            />
+            <ErrorBoundary
+              fallbackTitle="Spreadsheet Encountered an Issue"
+              fallbackMessage="A recoverable error was safely intercepted in the spreadsheet view. Click reload below to refresh the grid without losing your saved financial records."
+            >
+              <Workbook
+                ref={workbookRef}
+                data={sheetData}
+                onChange={handleSheetChange}
+                showToolbar={true}
+                showFormulaBar={true}
+                showSheetTabs={true}
+                allowEdit={true}
+                lang="en"
+              />
+            </ErrorBoundary>
           </div>
         )}
       </div>
