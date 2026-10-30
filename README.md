@@ -6,6 +6,37 @@ Catchy ACCA is an open-source project aimed at making ACCA exam preparation more
 
 This project is a work in progress and may or may not receive future updates. Features and functionality are subject to change as development continues. It was originally developed as a personal project to support and improve my ACCA studies.
 
+---
+
+## Screenshots
+
+### Application Interface
+![User Interface](screenshots/user%20interface.png)
+
+### Exam Planner
+![Exam Planner](screenshots/exam%20planner.png)
+
+### Progress Tracker
+![Progress Tracker](screenshots/progress%20tracker.png)
+
+### To-Do List
+![To-Do List](screenshots/to%20do%20list.png)
+
+### Notes
+![Note App](screenshots/note%20app.png)
+
+### Word Integration
+![Word Working](screenshots/word%20working.png)
+
+### Excel Integration
+![Excel Working](screenshots/excel%20working.png)
+
+### ACCA Updates
+![ACCA Updates](screenshots/acca%20updates.png)
+
+### Help and Resources
+![Help and Resources](screenshots/help%20and%20other%20resources.png)
+
 ## Features
 
 Catchy ACCA is designed to bring useful study tools together in one place, with an emphasis on simplicity, usability, and helping students stay organised.
