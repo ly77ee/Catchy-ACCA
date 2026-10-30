@@ -34,6 +34,48 @@ This project is a work in progress and may or may not receive future updates. Fe
 ### Help and Resources
 ![Help and Resources](screenshots/help%20and%20other%20resources.png)
 
+## Installation Guide
+
+Catchy ACCA is available as a desktop application for Windows and macOS.
+
+### 1. Download Catchy ACCA
+
+Visit the [GitHub Releases](https://github.com/ly77ee/Catchy-ACCA/releases) page and download the latest version for your operating system.
+
+### 2. Windows Installation
+
+1. Download the Windows installer (`.exe`) from the latest release.
+2. Open the downloaded installer.
+3. Follow the installation instructions.
+4. Once installed, launch Catchy ACCA from your Desktop shortcut or Start Menu.
+
+![Windows Installation](screenshots/windows-installation.png)
+
+### 3. macOS Installation
+
+1. Download the macOS `.dmg` file from the latest release.
+2. Open the downloaded `.dmg` file.
+3. Drag Catchy ACCA into the Applications folder.
+4. Open Catchy ACCA from Applications.
+
+![macOS Installation](screenshots/macos-installation.png)
+
+**Note:** If macOS displays a security warning because the application is not notarised, you may need to allow it through System Settings → Privacy & Security. Only do this if you downloaded the application from the official Catchy ACCA GitHub repository.
+
+### 4. First Launch
+
+When you open Catchy ACCA for the first time, follow the initial setup instructions to configure your study workspace.
+
+Your study data is stored locally on your device.
+
+### 5. Troubleshooting
+
+If you encounter installation or launch issues:
+
+- Make sure you downloaded the correct version for your operating system.
+- Check the [GitHub Issues](https://github.com/ly77ee/Catchy-ACCA/issues) page for known problems.
+- Report any bugs or installation issues through GitHub Issues.
+
 ## Features
 
 Catchy ACCA is designed to bring useful study tools together in one place, with an emphasis on simplicity, usability, and helping students stay organised.
