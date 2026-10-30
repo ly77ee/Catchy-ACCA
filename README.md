@@ -49,7 +49,6 @@ Visit the [GitHub Releases](https://github.com/ly77ee/Catchy-ACCA/releases) page
 3. Follow the installation instructions.
 4. Once installed, launch Catchy ACCA from your Desktop shortcut or Start Menu.
 
-![Windows Installation](screenshots/windows-installation.png)
 
 ### 3. macOS Installation
 
@@ -58,7 +57,6 @@ Visit the [GitHub Releases](https://github.com/ly77ee/Catchy-ACCA/releases) page
 3. Drag Catchy ACCA into the Applications folder.
 4. Open Catchy ACCA from Applications.
 
-![macOS Installation](screenshots/macos-installation.png)
 
 **Note:** If macOS displays a security warning because the application is not notarised, you may need to allow it through System Settings → Privacy & Security. Only do this if you downloaded the application from the official Catchy ACCA GitHub repository.
 
