@@ -4,7 +4,7 @@
 
 Catchy ACCA is an open-source project aimed at making ACCA exam preparation more organised and accessible. It is being developed with a focus on helping students manage their studies through a clean, modern desktop experience.
 
-This project is a work in progress and may or may not receive future updates. Features and functionality are subject to change as development continues. It was originally developed as a personal project to support and improve my ACCA studies.
+Features and functionality are subject to change as development continues. It was originally developed as a personal project to support and improve my ACCA studies.
 
 ---
 
