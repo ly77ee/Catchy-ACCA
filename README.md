@@ -13,26 +13,23 @@ This project is a work in progress and may or may not receive future updates. Fe
 ### Application Interface
 ![User Interface](screenshots/user%20interface.png)
 
-### Exam Planner
-![Exam Planner](screenshots/exam%20planner.png)
-
-### Progress Tracker
-![Progress Tracker](screenshots/progress%20tracker.png)
-
-### To-Do List
-![To-Do List](screenshots/to%20do%20list.png)
-
-### Notes
-![Note App](screenshots/note%20app.png)
+### Excel Integration
+![Excel Working](screenshots/excel%20working.png)
 
 ### Word Integration
 ![Word Working](screenshots/word%20working.png)
 
-### Excel Integration
-![Excel Working](screenshots/excel%20working.png)
-
 ### ACCA Updates
 ![ACCA Updates](screenshots/acca%20updates.png)
+
+### Notes
+![Note App](screenshots/note%20app.png)
+
+### To-Do List
+![To-Do List](screenshots/to%20do%20list.png)
+
+### Exam Planner
+![Exam Planner](screenshots/exam%20planner.png)
 
 ### Help and Resources
 ![Help and Resources](screenshots/help%20and%20other%20resources.png)
